@@ -9,7 +9,9 @@ if (!connectionString) {
 }
 
 // Initialize postgres client for queries
-const queryClient = postgres(connectionString);
+export const client = postgres(connectionString);
 
-// Export typed Drizzle database instance
-export const db = drizzle(queryClient, { schema });
+// Export typed Drizzle database instance with schema
+export const db = drizzle(client, { schema });
+
+export type Database = typeof db;

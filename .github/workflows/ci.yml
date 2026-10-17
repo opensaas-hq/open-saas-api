@@ -1,28 +1,33 @@
-name: CI
+name: Continuous Integration
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  lint-and-test:
+  validate:
+    name: Lint, Typecheck & Test
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Setup Bun
+      - name: Setup Bun Environment
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - name: Install Dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
-      - name: Run Biome Check (Lint & Format)
+      - name: Run Biome (Format & Lint Check)
         run: bun run lint
+
+      - name: Run TypeScript Typecheck
+        run: bun run typecheck
 
       - name: Run Tests
         run: bun test
