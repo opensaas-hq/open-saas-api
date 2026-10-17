@@ -10,6 +10,7 @@
   "dependencies": {
     "@opensaas/core": "workspace:*",
     "@opensaas/database": "workspace:*",
+    "@opensaas/auth": "workspace:*",
     "hono": "^4.6.11"
   }
 }
