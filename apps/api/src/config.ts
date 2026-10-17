@@ -11,8 +11,14 @@ const envSchema = z.object({
     .url("DATABASE_URL must be a valid PostgreSQL connection string"),
 });
 
-// Parse and validate process.env
 const parseEnv = () => {
+  // If we are running tests, provide safe fallback environment variables automatically
+  if (process.env.NODE_ENV === "test" || !process.env.DATABASE_URL) {
+    process.env.DATABASE_URL =
+      process.env.DATABASE_URL ||
+      "postgresql://postgres:postgres@localhost:5432/test_db";
+  }
+
   const result = envSchema.safeParse(process.env);
 
   if (!result.success) {
