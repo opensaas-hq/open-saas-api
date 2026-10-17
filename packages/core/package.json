@@ -1,0 +1,17 @@
+{
+  "name": "@opensaas/core",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "pino": "^9.0.0"
+  },
+  "devDependencies": {
+    "pino-pretty": "^11.0.0"
+  }
+}
