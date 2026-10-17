@@ -1,0 +1,17 @@
+{
+  "name": "open-saas-api-monorepo",
+  "private": true,
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev": "bun run --filter @opensaas/api dev",
+    "build": "bun run --filter \"*\" build",
+    "test": "bun test",
+    "lint": "biome check .",
+    "format": "biome format --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.8.0",
+    "@types/bun": "latest",
+    "typescript": "^5.5.0"
+  }
+}
