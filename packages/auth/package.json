@@ -1,0 +1,16 @@
+{
+  "name": "@opensaas/auth",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opensaas/core": "workspace:*",
+    "@opensaas/database": "workspace:*",
+    "better-auth": "^1.1.0"
+  }
+}
