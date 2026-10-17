@@ -50,3 +50,19 @@ export class ValidationError extends AppError {
     super(message, 422, "VALIDATION_ERROR", details);
   }
 }
+
+export type ApiSuccessResponse<T> = {
+  success: true;
+  data: T;
+};
+
+export type ApiErrorResponse = {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+};
+
+export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
