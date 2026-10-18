@@ -2,6 +2,7 @@ import { type ApiResponse, AppError, env, logger } from "@opensaas/core";
 import { checkDatabaseHealth } from "@opensaas/database";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { authRouter } from "./routes/auth";
 import { contactsRouter } from "./routes/contacts";
 import type { AppEnv } from "./types";
 
@@ -31,7 +32,7 @@ app.get("/api/health", async (c) => {
   );
 });
 
-// Mount CRM routes
+app.route("/api/auth", authRouter);
 app.route("/api/contacts", contactsRouter);
 
 app.onError((err, c) => {

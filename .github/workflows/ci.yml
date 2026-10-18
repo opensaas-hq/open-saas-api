@@ -11,6 +11,21 @@ jobs:
     name: Lint, Typecheck & Test
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: opensaas_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -29,5 +44,14 @@ jobs:
       - name: Run TypeScript Typecheck
         run: bun run typecheck
 
+      - name: Run Database Push
+        env:
+           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test
+           run: bun --filter @opensaas/database db:push
+
       - name: Run Tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test
+          BETTER_AUTH_SECRET: ci_secret_key_123456789_opensaas
+          BETTER_AUTH_URL: http://localhost:3000
         run: bun test

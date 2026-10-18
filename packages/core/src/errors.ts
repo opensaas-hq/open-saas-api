@@ -66,3 +66,10 @@ export type ApiErrorResponse = {
 };
 
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
+
+export class ForbiddenError extends AppError {
+  constructor(message = "Forbidden", details?: Record<string, unknown>) {
+    super(message, 403, "FORBIDDEN", details);
+    this.name = "ForbiddenError";
+  }
+}

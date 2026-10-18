@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { extractTelemetryFromHeaders } from "./telemetry";
+import { extractTelemetryFromHeaders } from "../telemetry";
 
 describe("@opensaas/auth - Telemetry & Fingerprinting", () => {
   test("should extract real IP from Cloudflare header", () => {

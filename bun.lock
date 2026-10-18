@@ -19,8 +19,9 @@
     },
     "apps/api": {
       "name": "@opensaas/api",
-      "version": "0.2.0",
+      "version": "0.1.0",
       "dependencies": {
+        "@hono/zod-validator": "^0.4.2",
         "@opensaas/auth": "workspace:*",
         "@opensaas/core": "workspace:*",
         "@opensaas/database": "workspace:*",
@@ -29,7 +30,7 @@
     },
     "packages/auth": {
       "name": "@opensaas/auth",
-      "version": "0.2.0",
+      "version": "0.1.0",
       "dependencies": {
         "@opensaas/core": "workspace:*",
         "@opensaas/database": "workspace:*",
@@ -38,7 +39,7 @@
     },
     "packages/core": {
       "name": "@opensaas/core",
-      "version": "0.2.0",
+      "version": "0.1.0",
       "dependencies": {
         "pino": "^9.5.0",
       },
@@ -48,7 +49,7 @@
     },
     "packages/database": {
       "name": "@opensaas/database",
-      "version": "0.2.0",
+      "version": "0.1.0",
       "dependencies": {
         "drizzle-orm": "^0.36.0",
         "postgres": "^3.4.5",
@@ -188,6 +189,8 @@
     "@esbuild/win32-ia32": ["@esbuild/win32-ia32@0.19.12", "", { "os": "win32", "cpu": "ia32" }, "sha512-+ZOE6pUkMOJfmxmBZElNOx72NKpIa/HFOMGzu8fqzQJ5kgf6aTGrcJaFsNiVMH4JKpMipyK+7k0n2UXN7a8YKQ=="],
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.19.12", "", { "os": "win32", "cpu": "x64" }, "sha512-T1QyPSDCyMXaO3pzBkF96E8xMkiRYbUEZADd29SyPGabqxMViNoii+NcK7eWJAEoU6RZyEm5lVSIjTmcdoB9HA=="],
+
+    "@hono/zod-validator": ["@hono/zod-validator@0.4.3", "", { "peerDependencies": { "hono": ">=3.9.0", "zod": "^3.19.1" } }, "sha512-xIgMYXDyJ4Hj6ekm9T9Y27s080Nl9NXHcJkOvkXPhubOLj8hZkOL8pDnnXfvCf5xEE8Q4oMFenQUZZREUY2gqQ=="],
 
     "@inquirer/ansi": ["@inquirer/ansi@2.0.9", "", {}, "sha512-0Ywt3S8tqM6TWUcsRlBFQ1x+X3/o8kktX0ZiKAnByYb9GFDknnOhse1PVtfiD2BXPI8ar+BWx9PV9R0lQIcygw=="],
 

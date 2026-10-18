@@ -8,6 +8,31 @@
 - [ ] 📚 Documentation update
 - [ ] ⚙️ CI/CD or Infrastructure change
 
+---
+
+## Detailed Changes & Implementation
+<!-- Expand on the sections below depending on what type of change this PR introduces. Delete the ones that do not apply. -->
+
+### 🐛 Bug Fixes
+- **Root Cause:** <!-- What caused the bug? -->
+- **Solution:** <!-- How was it resolved? -->
+
+### ✨ New Features
+- **Behavior:** <!-- What new capabilities are added? -->
+- **API / Schema Changes:** <!-- Any new endpoints, tables, or fields? -->
+
+### ♻️ Refactoring / Architectural Improvements
+- **Motivation:** <!-- Why was this refactor needed? -->
+- **Decoupling / Patterns:** <!-- How does this improve the architecture? -->
+
+---
+
+## Testing & Verification
+<!-- Describe how these changes were tested (unit tests, integration tests, manual testing, etc.). -->
+- [ ] Unit tests added/updated.
+- [ ] Integration tests added/updated.
+- [ ] Tested locally via `bun test`.
+
 ## Checklist
 - [ ] Code follows project formatting and linting rules (`bun run lint`).
 - [ ] TypeScript types compile without errors (`bun run typecheck`).
