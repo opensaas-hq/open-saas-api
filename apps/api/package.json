@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "bun --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist",
+    "typecheck": "tsc --noEmit",
     "test": "bun test"
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.4.2",
     "@opensaas/core": "workspace:*",
     "@opensaas/database": "workspace:*",
     "@opensaas/auth": "workspace:*",

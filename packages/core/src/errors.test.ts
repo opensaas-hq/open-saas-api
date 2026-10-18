@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   AppError,
   BadRequestError,
+  ForbiddenError,
   NotFoundError,
   UnauthorizedError,
   ValidationError,
@@ -106,6 +107,15 @@ describe("@opensaas/core - Errors System", () => {
       expect(error.statusCode).toBe(422);
       expect(error.code).toBe("VALIDATION_ERROR");
       expect(error.details).toEqual(validationDetails);
+    });
+  });
+
+  describe("ForbiddenError (403)", () => {
+    test("should have default message, 403 status, and FORBIDDEN code", () => {
+      const error = new ForbiddenError();
+      expect(error.message).toBe("Forbidden");
+      expect(error.statusCode).toBe(403);
+      expect(error.code).toBe("FORBIDDEN");
     });
   });
 });
