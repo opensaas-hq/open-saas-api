@@ -51,25 +51,18 @@ export class ValidationError extends AppError {
   }
 }
 
-export type ApiSuccessResponse<T> = {
-  success: true;
-  data: T;
-};
-
-export type ApiErrorResponse = {
-  success: false;
-  error: {
-    code: string;
-    message: string;
-    details?: unknown;
-  };
-};
-
-export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
-
 export class ForbiddenError extends AppError {
   constructor(message = "Forbidden", details?: Record<string, unknown>) {
     super(message, 403, "FORBIDDEN", details);
     this.name = "ForbiddenError";
   }
 }
+
+// Response envelope types live in ./response; re-exported here for convenience
+// so existing `import { ApiResponse } from "@opensaas/core"` keeps working.
+export type {
+  ApiErrorResponse,
+  ApiResponse,
+  ApiSuccessResponse,
+  PaginationMeta,
+} from "./response";
