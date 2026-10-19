@@ -1,10 +1,6 @@
-import { ForbiddenError, ValidationError } from "@opensaas/core";
+import { type Env, ForbiddenError, ValidationError } from "@opensaas/core";
 
-export type RegistrationMode =
-  | "public"
-  | "waiting_list"
-  | "invite_code"
-  | "paid_required";
+export type RegistrationMode = Env["REGISTRATION_MODE"];
 
 export interface RegistrationContext {
   mode: RegistrationMode;

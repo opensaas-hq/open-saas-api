@@ -6,7 +6,7 @@ import {
   NotFoundError,
   UnauthorizedError,
   ValidationError,
-} from "./errors";
+} from "../errors";
 
 describe("@opensaas/core - Errors System", () => {
   describe("AppError (Base Class)", () => {
