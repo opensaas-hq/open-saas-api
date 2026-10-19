@@ -1,8 +1,12 @@
-import { env } from "@opensaas/core";
+import { getEnv } from "@opensaas/core";
 import { db, schema } from "@opensaas/database";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, organization } from "better-auth/plugins";
+
+// Consume the config factory; the core `env` singleton no longer exists.
+// NOTE: `betterAuth(...)` below is still built at import time — tracked debt.
+const env = getEnv();
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {

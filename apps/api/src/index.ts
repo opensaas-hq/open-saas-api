@@ -1,10 +1,24 @@
-import { type ApiResponse, AppError, env, logger } from "@opensaas/core";
+import {
+  type ApiResponse,
+  AppError,
+  getEnv,
+  getLogger,
+  initConfig,
+} from "@opensaas/core";
 import { checkDatabaseHealth } from "@opensaas/database";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { authRouter } from "./routes/auth";
 import { contactsRouter } from "./routes/contacts";
 import type { AppEnv } from "./types";
+
+// Explicit boot: validate configuration and abort with a report if it is
+// missing or invalid. Must run before any config value is read.
+initConfig();
+
+// Derive local env/logger from the factories instead of importing singletons.
+const env = getEnv();
+const logger = getLogger();
 
 const app = new Hono<AppEnv>();
 

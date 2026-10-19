@@ -1,6 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { REGISTRATION_MODES, envSchema, formatEnvError } from "../config";
+import {
+  ConfigError,
+  REGISTRATION_MODES,
+  createEnv,
+  envSchema,
+  formatEnvError,
+  getEnv,
+  initConfig,
+} from "../config";
 
+// Minimal valid configuration reused across the schema assertions below.
 const validEnv = {
   DATABASE_URL: "postgresql://postgres:password@localhost:5432/opensaas",
   BETTER_AUTH_SECRET: "x".repeat(32),
@@ -111,6 +120,39 @@ describe("@opensaas/core - Config", () => {
     });
   });
 
+  // Factories: pure parsing (createEnv), memoized access (getEnv) and the
+  // explicit boot initializer (initConfig).
+  describe("createEnv / getEnv / initConfig", () => {
+    test("createEnv parses an injected source without touching process.env", () => {
+      const env = createEnv(validEnv);
+
+      expect(env.NODE_ENV).toBe("development");
+      expect(env.REGISTRATION_MODE).toBe("public");
+    });
+
+    test("createEnv throws a ConfigError (no process.exit) on invalid input", () => {
+      expect(() =>
+        createEnv({ ...validEnv, REGISTRATION_MODE: "bogus" }),
+      ).toThrow(ConfigError);
+    });
+
+    test("getEnv returns the parsed environment", () => {
+      const env = getEnv(validEnv);
+
+      expect(env.PORT).toBeGreaterThan(0);
+      expect(env.REGISTRATION_MODE).toBe("public");
+    });
+
+    test("initConfig returns the parsed environment for a valid source", () => {
+      const env = initConfig(validEnv);
+
+      expect(env.DATABASE_URL).toBe(validEnv.DATABASE_URL);
+    });
+  });
+
+  // Boot behavior: importing the module must not exit, while calling
+  // initConfig() must fail fast on invalid config. Exercised in a subprocess
+  // because the failure path terminates the process.
   describe("boot behavior (subprocess)", () => {
     const bootEnv = {
       NODE_ENV: "test",
@@ -123,14 +165,12 @@ describe("@opensaas/core - Config", () => {
 
     const bootWith = async (overrides: Record<string, string>) => {
       const entry = `${import.meta.dir}/../config.ts`;
-      const proc = Bun.spawn(
-        [process.execPath, "-e", `await import(${JSON.stringify(entry)})`],
-        {
-          env: { ...bootEnv, ...overrides },
-          stdout: "pipe",
-          stderr: "pipe",
-        },
-      );
+      const script = `const m = await import(${JSON.stringify(entry)}); m.initConfig();`;
+      const proc = Bun.spawn([process.execPath, "-e", script], {
+        env: { ...bootEnv, ...overrides },
+        stdout: "pipe",
+        stderr: "pipe",
+      });
       const stderr = await new Response(proc.stderr).text();
       const code = await proc.exited;
       return { code, stderr };
