@@ -1,11 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { sql } from "drizzle-orm";
-import { db } from "../client";
 import { assertTestDatabase } from "./guard";
 import {
   APP_ROLE,
   BUSINESS_TABLES,
   applyRls,
+  asOwner,
   readRlsState,
   teardownRls,
 } from "./rls-support";
@@ -16,7 +15,8 @@ import {
  * still administer them.
  *
  * Runs with the bootstrap applied to the test database; it applies and removes
- * it itself so it does not depend on an external CI step.
+ * it itself so it does not depend on an external CI step. All assertions use a
+ * dedicated owner connection, so the result does not depend on `RLS_ENABLED`.
  */
 describe("@opensaas/database - RLS bootstrap (§2.5.1)", () => {
   beforeAll(async () => {
@@ -29,14 +29,17 @@ describe("@opensaas/database - RLS bootstrap (§2.5.1)", () => {
   });
 
   test("the app role exists, can log in, and has no RLS escape hatch", async () => {
-    const [role] = (await db.execute(sql`
-      SELECT rolsuper, rolbypassrls, rolcanlogin
-      FROM pg_roles WHERE rolname = ${APP_ROLE}
-    `)) as unknown as {
-      rolsuper: boolean;
-      rolbypassrls: boolean;
-      rolcanlogin: boolean;
-    }[];
+    const [role] = await asOwner(
+      async (sql) =>
+        (await sql`
+          SELECT rolsuper, rolbypassrls, rolcanlogin
+          FROM pg_roles WHERE rolname = ${APP_ROLE}
+        `) as unknown as {
+          rolsuper: boolean;
+          rolbypassrls: boolean;
+          rolcanlogin: boolean;
+        }[],
+    );
 
     expect(role).toBeDefined();
     expect(role?.rolsuper).toBe(false);
@@ -45,13 +48,16 @@ describe("@opensaas/database - RLS bootstrap (§2.5.1)", () => {
   });
 
   test("the app role does not own the business tables", async () => {
-    const rows = (await db.execute(sql`
-      SELECT tablename
-      FROM pg_tables
-      WHERE schemaname = 'public'
-        AND tablename IN ('contacts', 'branches', 'audit_log')
-        AND tableowner = ${APP_ROLE}
-    `)) as unknown as { tablename: string }[];
+    const rows = await asOwner(
+      async (sql) =>
+        (await sql`
+          SELECT tablename
+          FROM pg_tables
+          WHERE schemaname = 'public'
+            AND tablename IN ('contacts', 'branches', 'audit_log')
+            AND tableowner = ${APP_ROLE}
+        `) as unknown as { tablename: string }[],
+    );
 
     expect(rows).toEqual([]);
   });
@@ -69,12 +75,15 @@ describe("@opensaas/database - RLS bootstrap (§2.5.1)", () => {
   });
 
   test("each business table carries the tenant_isolation policy", async () => {
-    const rows = (await db.execute(sql`
-      SELECT tablename
-      FROM pg_policies
-      WHERE schemaname = 'public' AND policyname = 'tenant_isolation'
-      ORDER BY tablename
-    `)) as unknown as { tablename: string }[];
+    const rows = await asOwner(
+      async (sql) =>
+        (await sql`
+          SELECT tablename
+          FROM pg_policies
+          WHERE schemaname = 'public' AND policyname = 'tenant_isolation'
+          ORDER BY tablename
+        `) as unknown as { tablename: string }[],
+    );
 
     expect(rows.map((row) => row.tablename)).toEqual(
       [...BUSINESS_TABLES].sort(),
@@ -84,13 +93,18 @@ describe("@opensaas/database - RLS bootstrap (§2.5.1)", () => {
   test("the owner role can still administer the tables (DDL works)", async () => {
     // The owner keeps full DDL rights: FORCE RLS binds it to the policies, but
     // it can still ALTER the table. Use a harmless, reversible statement.
-    await db.execute(sql`ALTER TABLE branches ADD COLUMN _rls_probe_ text`);
-    await db.execute(sql`ALTER TABLE branches DROP COLUMN _rls_probe_`);
+    await asOwner(async (sql) => {
+      await sql`ALTER TABLE branches ADD COLUMN _rls_probe_ text`;
+      await sql`ALTER TABLE branches DROP COLUMN _rls_probe_`;
+    });
 
-    const [column] = (await db.execute(sql`
-      SELECT column_name FROM information_schema.columns
-      WHERE table_name = 'branches' AND column_name = '_rls_probe_'
-    `)) as unknown as { column_name: string }[];
+    const [column] = await asOwner(
+      async (sql) =>
+        (await sql`
+          SELECT column_name FROM information_schema.columns
+          WHERE table_name = 'branches' AND column_name = '_rls_probe_'
+        `) as unknown as { column_name: string }[],
+    );
     expect(column).toBeUndefined();
   });
 });

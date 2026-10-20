@@ -17,11 +17,8 @@ ALTER TABLE branches DISABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_log NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE audit_log DISABLE ROW LEVEL SECURITY;
 
-REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLE
-  contacts,
-  branches,
-  audit_log
-FROM opensaas_app;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM opensaas_app;
+REVOKE USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public FROM opensaas_app;
 REVOKE USAGE ON SCHEMA public FROM opensaas_app;
 
 -- Drop the role only if it owns nothing and has no dependent objects.

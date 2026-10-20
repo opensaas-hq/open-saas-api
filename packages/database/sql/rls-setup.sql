@@ -29,14 +29,13 @@ $$;
 -- Ensure the role can never bypass RLS, even if it is re-created by hand.
 ALTER ROLE opensaas_app NOSUPERUSER NOBYPASSRLS;
 
--- The app role needs to see the schema and run DML on the business tables.
--- It is deliberately granted no DDL and no ownership.
+-- The app role needs to see the schema and run DML on the tables. RLS is only
+-- enforced on the three business tables below; the Better Auth tables remain
+-- unguarded (framework-owned, §2.5 scope) but still need grants for the app to
+-- function. The role is deliberately granted no DDL and no ownership.
 GRANT USAGE ON SCHEMA public TO opensaas_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
-  contacts,
-  branches,
-  audit_log
-TO opensaas_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO opensaas_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO opensaas_app;
 
 -- Enable and FORCE RLS so the owner is bound by the policies as well.
 ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;

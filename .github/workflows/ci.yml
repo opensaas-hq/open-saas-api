@@ -46,8 +46,8 @@ jobs:
 
       - name: Run Database Push
         env:
-           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test
-           run: bun --filter @opensaas/database db:push
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test
+        run: bun --filter @opensaas/database db:push
 
       - name: Run Tests
         env:
@@ -55,3 +55,54 @@ jobs:
           BETTER_AUTH_SECRET: ci_secret_key_123456789_opensaas
           BETTER_AUTH_URL: http://localhost:3000
         run: bun test
+
+  rls:
+    name: Row-Level Security proof
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: opensaas_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun Environment
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Apply Schema
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test
+        run: bun --filter @opensaas/database db:push
+
+      - name: Apply RLS Bootstrap
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test
+        run: bun --filter @opensaas/database db:rls:test
+
+      - name: Run RLS Proof Suite
+        working-directory: packages/database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test
+          DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/opensaas_test
+          RLS_ENABLED: "true"
+          BETTER_AUTH_SECRET: ci_secret_key_123456789_opensaas
+          BETTER_AUTH_URL: http://localhost:3000
+        run: bun test src/__tests__/rls.test.ts src/__tests__/rls-setup.test.ts

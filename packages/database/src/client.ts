@@ -33,6 +33,12 @@ export type DbPoolConfig = {
 export type DbConfig = {
   databaseUrl: string;
   pool: DbPoolConfig;
+  /**
+   * Postgres role the connection assumes at startup (`role` startup
+   * parameter). The runtime connects as the dedicated `opensaas_app` role when
+   * RLS is on, so the database itself refuses cross-tenant access (§2.5).
+   */
+  role?: string;
 };
 
 /**
@@ -45,8 +51,12 @@ export const createDb = (config: DbConfig) => {
     max: config.pool.max,
     idle_timeout: config.pool.idleTimeout,
     connect_timeout: config.pool.connectTimeout,
-    // `statement_timeout` is a server connection parameter, not a pool option.
-    connection: { statement_timeout: config.pool.statementTimeout },
+    // `statement_timeout` and `role` are server connection parameters, not pool
+    // options. `role` switches the session to the RLS-bound app role.
+    connection: {
+      statement_timeout: config.pool.statementTimeout,
+      ...(config.role ? { role: config.role } : {}),
+    },
   });
 
   return drizzle(client, { schema });
@@ -115,9 +125,17 @@ export const buildResilienceConfig = (env: {
 });
 
 /**
+ * The dedicated RLS-bound runtime role the client assumes when RLS is on.
+ */
+export const RLS_APP_ROLE = "opensaas_app";
+
+/**
  * Lazily-initialized default handle, built from the validated environment via
  * `getEnv()`. Constructed on first use, not at import, so importing the package
  * never connects and never throws.
+ *
+ * When `RLS_ENABLED` is on, the connection assumes `opensaas_app` at startup so
+ * row-level security applies to every query (§2.5).
  */
 export const getDb = (): Database => {
   if (!cachedDb) {
@@ -125,6 +143,7 @@ export const getDb = (): Database => {
     cachedDb = createDb({
       databaseUrl: env.DATABASE_URL,
       pool: buildPoolConfig(env),
+      role: env.RLS_ENABLED ? RLS_APP_ROLE : undefined,
     });
   }
   return cachedDb;
