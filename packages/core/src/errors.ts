@@ -58,6 +58,20 @@ export class ForbiddenError extends AppError {
   }
 }
 
+/**
+ * 503 — the service is temporarily unable to handle the request, e.g. a
+ * dependency is down or a circuit breaker is open. Callers may retry later.
+ */
+export class ServiceUnavailableError extends AppError {
+  constructor(
+    message = "Service temporarily unavailable",
+    details?: Record<string, unknown>,
+  ) {
+    super(message, 503, "SERVICE_UNAVAILABLE", details);
+    this.name = "ServiceUnavailableError";
+  }
+}
+
 // Response envelope types live in ./response; re-exported here for convenience
 // so existing `import { ApiResponse } from "@opensaas/core"` keeps working.
 export type {

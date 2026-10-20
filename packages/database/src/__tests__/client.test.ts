@@ -2,7 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { buildPoolConfig, close, createDb } from "../client";
+import {
+  buildPoolConfig,
+  buildResilienceConfig,
+  close,
+  createDb,
+  executeResilient,
+  waitForDatabase,
+} from "../client";
 
 describe("@opensaas/database - Client factory", () => {
   test("buildPoolConfig maps every env value to the pool", () => {
@@ -81,5 +88,36 @@ describe("@opensaas/database - Client factory", () => {
       const contents = readFileSync(join(srcDir, name), "utf8");
       expect(contents).not.toContain("process.env");
     }
+  });
+});
+
+describe("@opensaas/database - Resilience config", () => {
+  test("maps environment knobs to the retry and breaker config", () => {
+    const config = buildResilienceConfig({
+      DB_RETRY_MAX_ATTEMPTS: 7,
+      DB_RETRY_BASE_DELAY_MS: 50,
+      DB_RETRY_MAX_DELAY_MS: 2_000,
+      DB_BREAKER_ENABLED: false,
+      DB_BREAKER_FAILURE_THRESHOLD: 9,
+      DB_BREAKER_COOLDOWN_MS: 30_000,
+    });
+
+    expect(config).toEqual({
+      retry: { maxAttempts: 7, baseDelayMs: 50, maxDelayMs: 2_000 },
+      breaker: { enabled: false, failureThreshold: 9, cooldownMs: 30_000 },
+    });
+  });
+});
+
+describe("@opensaas/database - Resilient execution", () => {
+  test("waitForDatabase resolves against a live database", async () => {
+    await expect(waitForDatabase()).resolves.toBeUndefined();
+  });
+
+  test("executeResilient runs an idempotent read", async () => {
+    const result = await executeResilient(() => Promise.resolve("read"), {
+      idempotent: true,
+    });
+    expect(result).toBe("read");
   });
 });

@@ -56,6 +56,23 @@ export const envSchema = z.object({
   DB_IDLE_TIMEOUT_S: z.coerce.number().int().nonnegative().default(20),
   DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
   DB_CONNECT_TIMEOUT_S: z.coerce.number().int().positive().default(10),
+  // Connection resilience (§2.5): startup retry, transient-retry and the
+  // circuit breaker. Defaults are safe; every value is documented in
+  // `.env.example`.
+  DB_RETRY_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
+  DB_RETRY_BASE_DELAY_MS: z.coerce.number().int().nonnegative().default(100),
+  DB_RETRY_MAX_DELAY_MS: z.coerce.number().int().positive().default(5_000),
+  DB_BREAKER_ENABLED: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+  DB_BREAKER_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(5),
+  DB_BREAKER_COOLDOWN_MS: z.coerce.number().int().positive().default(10_000),
+  DB_BREAKER_PROBE_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(2_000),
   DISPOSABLE_EMAIL_DOMAINS: z.string().optional(),
   // An empty string (e.g. an unset `.env` entry) falls back to the default
   // instead of being treated as an invalid value.

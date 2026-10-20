@@ -110,4 +110,29 @@ describe("@opensaas/database - Contact repository", () => {
     expect(after.items).toHaveLength(1);
     expect(after.items[0]?.name).toBe("Existing");
   });
+
+  test("search matches wildcard characters literally", async () => {
+    const orgId = await createOrg(suffix, "orgsearch");
+    await createContact({ organizationId: orgId, name: "100% Cotton" });
+    await createContact({ organizationId: orgId, name: "100 percent" });
+
+    // `100%` must match only the literal percent sign, not every name
+    // beginning with "100".
+    const percent = await getContactsByOrganization({
+      organizationId: orgId,
+      search: "100%",
+    });
+    expect(percent.items).toHaveLength(1);
+    expect(percent.items[0]?.name).toBe("100% Cotton");
+
+    // `_` must match a literal underscore, not any single character.
+    await createContact({ organizationId: orgId, name: "a_b" });
+    await createContact({ organizationId: orgId, name: "axb" });
+
+    const underscore = await getContactsByOrganization({
+      organizationId: orgId,
+      search: "_",
+    });
+    expect(underscore.items.map((c) => c.name)).toEqual(["a_b"]);
+  });
 });

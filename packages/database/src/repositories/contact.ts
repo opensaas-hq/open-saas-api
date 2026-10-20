@@ -1,6 +1,7 @@
-import { and, count, eq, ilike, or } from "drizzle-orm";
+import { and, count, eq, or, sql } from "drizzle-orm";
 import { type Transaction, db } from "../client";
 import { type ContactStatus, contacts } from "../schema";
+import { toContainsLikePattern } from "./like";
 
 /** A single contact to insert, without the tenant (supplied at the top level). */
 export type ContactInput = {
@@ -58,11 +59,13 @@ export async function getContactsByOrganization(options: GetContactsOptions) {
   }
 
   if (options.search && options.search.trim() !== "") {
-    const searchTerm = `%${options.search.trim()}%`;
+    const pattern = toContainsLikePattern(options.search.trim());
+    // Escape user wildcards: `ESCAPE '\'` makes the backslashes from
+    // `toContainsLikePattern` literal escapes rather than pattern characters.
     const searchCondition = or(
-      ilike(contacts.name, searchTerm),
-      ilike(contacts.email, searchTerm),
-      ilike(contacts.phone, searchTerm),
+      sql`${contacts.name} ILIKE ${pattern} ESCAPE '\\'`,
+      sql`${contacts.email} ILIKE ${pattern} ESCAPE '\\'`,
+      sql`${contacts.phone} ILIKE ${pattern} ESCAPE '\\'`,
     );
 
     if (searchCondition) {
