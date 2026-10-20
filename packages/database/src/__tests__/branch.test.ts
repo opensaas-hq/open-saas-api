@@ -6,7 +6,9 @@ import {
   updateBranch,
 } from "../repositories/branch";
 import { createOrganization } from "../repositories/organization";
-import "./setup";
+import { useTestDatabase } from "./setup";
+
+useTestDatabase();
 
 const createOrg = async (suffix: string, label: string) => {
   const id = `org_${label}_${suffix}`;

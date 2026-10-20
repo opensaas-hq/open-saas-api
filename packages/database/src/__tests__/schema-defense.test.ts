@@ -4,7 +4,9 @@ import { db } from "../client";
 import { createContact } from "../repositories/contact";
 import { createOrganization } from "../repositories/organization";
 import { contacts, organization } from "../schema";
-import "./setup";
+import { useTestDatabase } from "./setup";
+
+useTestDatabase();
 
 const createOrg = async (suffix: string, label: string) => {
   const id = `org_${label}_${suffix}`;

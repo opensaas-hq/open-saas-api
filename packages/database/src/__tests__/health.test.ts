@@ -1,7 +1,10 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { checkDatabaseHealth } from "../health";
+import { assertTestDatabase } from "./guard";
 
 describe("@opensaas/database - Health probe", () => {
+  beforeAll(assertTestDatabase);
+
   test("reports the real connection state (true against a live database)", async () => {
     expect(await checkDatabaseHealth()).toBe(true);
   });

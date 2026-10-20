@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -10,6 +10,7 @@ import {
   executeResilient,
   waitForDatabase,
 } from "../client";
+import { assertTestDatabase } from "./guard";
 
 describe("@opensaas/database - Client factory", () => {
   test("buildPoolConfig maps every env value to the pool", () => {
@@ -110,6 +111,8 @@ describe("@opensaas/database - Resilience config", () => {
 });
 
 describe("@opensaas/database - Resilient execution", () => {
+  beforeAll(assertTestDatabase);
+
   test("waitForDatabase resolves against a live database", async () => {
     await expect(waitForDatabase()).resolves.toBeUndefined();
   });

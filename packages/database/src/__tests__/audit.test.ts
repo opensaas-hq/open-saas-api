@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { type AuditEvent, REDACTED } from "@opensaas/core";
 import { DatabaseAuditRepository, listAuditRows } from "../repositories/audit";
 import { createOrganization } from "../repositories/organization";
-import "./setup";
+import { useTestDatabase } from "./setup";
+
+useTestDatabase();
 
 const createOrg = async (suffix: string, label: string) => {
   const id = `org_${label}_${suffix}`;
