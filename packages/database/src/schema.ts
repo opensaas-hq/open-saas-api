@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -177,6 +178,66 @@ export const invitation = pgTable("invitation", {
     .defaultNow()
     .notNull(),
 });
+
+/**
+ * Project-owned waitlist registry. Registration in `waiting_list` mode records
+ * a queryable row here instead of reshaping Better Auth's `user` table
+ * (docs/v3/architecture.md §11.1). Keyed by email so a waitlisted registration
+ * that has no user yet is still captured.
+ */
+export const waitlistEntry = pgTable(
+  "waitlist_entry",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    email: text("email").notNull().unique(),
+    status: text("status").default("pending").notNull(), // pending, invited, converted
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [index("waitlist_entry_email_idx").on(table.email)],
+);
+
+/**
+ * Lifecycle status of a registration invite code. A `pgEnum` keeps invalid
+ * values a database error rather than a silent application bug.
+ */
+export const registrationCodeStatus = pgEnum("registration_code_status", [
+  "pending",
+  "consumed",
+  "revoked",
+]);
+
+/** Type of a registration code status, derived from the enum. */
+export type RegistrationCodeStatus =
+  (typeof registrationCodeStatus.enumValues)[number];
+
+/**
+ * Project-owned registration invite codes. Distinct from Better Auth's
+ * `invitation` table (which is email-targeted org membership): a code is a
+ * standalone, optionally multi-use token validated and consumed atomically
+ * inside the registration transaction (§3.2).
+ */
+export const registrationCode = pgTable(
+  "registration_code",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    code: text("code").notNull().unique(),
+    status: registrationCodeStatus("status").default("pending").notNull(),
+    maxUses: integer("max_uses").default(1).notNull(),
+    useCount: integer("use_count").default(0).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    consumedByUserId: text("consumed_by_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [index("registration_code_code_idx").on(table.code)],
+);
 
 /**
  * Custom Business Logic - Branches

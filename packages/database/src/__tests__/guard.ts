@@ -35,6 +35,8 @@ export const TRUNCATE_ALL = sql`
     "audit_log",
     "contacts",
     "branches",
+    "waitlist_entry",
+    "registration_code",
     "member",
     "invitation",
     "organization",

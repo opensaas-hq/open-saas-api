@@ -58,7 +58,10 @@ describe("@opensaas/database - RLS cross-tenant proof (§2.5.3)", () => {
 
     // Tear down as the owner: dropping the role is not something the app role
     // may do, and it must happen after its connections are closed.
-    process.env.RLS_ENABLED = undefined;
+    // `delete` (not `= undefined`, which coerces to the string "undefined")
+    // restores the pre-suite state so later suites rebuild a valid config.
+    // biome-ignore lint/performance/noDelete: env var removal requires delete.
+    delete process.env.RLS_ENABLED;
     const { resetConfig } = await import("@opensaas/core");
     resetConfig();
     resetDb();
