@@ -1,17 +1,41 @@
 import { sql } from "drizzle-orm";
-import { db } from "./client";
+import { getDb } from "./client";
 
-export async function checkDatabaseHealth(): Promise<boolean> {
-  // Mock automatic success during automated test runs
-  if (process.env.NODE_ENV === "test") {
-    return true;
-  }
+/** Minimal probe surface, so tests can inject a fake without a real handle. */
+export type HealthProbe = {
+  execute: (query: unknown) => Promise<unknown>;
+};
+
+/** Options for {@link checkDatabaseHealth}. */
+export type CheckDatabaseHealthOptions = {
+  /** Milliseconds to wait for the probe before treating the database as down. */
+  timeoutMs?: number;
+  /** Handle to probe; defaults to the shared lazy handle (for tests/DI). */
+  db?: HealthProbe;
+};
+
+/**
+ * Probe the database with a trivial query. No environment branching and no test
+ * mocking: this reports the real state of the connection, so a test that wants
+ * a fake must inject one via `db`. The readiness endpoint and its behavior live
+ * in `apps/api` (§4.6).
+ */
+export async function checkDatabaseHealth(
+  options: CheckDatabaseHealthOptions = {},
+): Promise<boolean> {
+  const timeoutMs = options.timeoutMs ?? 2_000;
+  const executor = options.db ?? getDb();
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(
+      () => reject(new Error("database health check timed out")),
+      timeoutMs,
+    );
+  });
 
   try {
-    await db.execute(sql`SELECT 1`);
+    await Promise.race([executor.execute(sql`SELECT 1`), timeout]);
     return true;
-  } catch (error) {
-    console.error("Database health check error:", error);
+  } catch {
     return false;
   }
 }

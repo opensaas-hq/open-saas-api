@@ -50,6 +50,12 @@ export const envSchema = z.object({
     .string()
     .min(32, "BETTER_AUTH_SECRET must be at least 32 characters"),
   BETTER_AUTH_URL: z.url("BETTER_AUTH_URL must be a valid URL"),
+  // Connection pool settings consumed by `@opensaas/database`'s `createDb`.
+  // Safe defaults; values are in the units documented in `.env.example`.
+  DB_POOL_MAX: z.coerce.number().int().positive().default(10),
+  DB_IDLE_TIMEOUT_S: z.coerce.number().int().nonnegative().default(20),
+  DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  DB_CONNECT_TIMEOUT_S: z.coerce.number().int().positive().default(10),
   DISPOSABLE_EMAIL_DOMAINS: z.string().optional(),
   // An empty string (e.g. an unset `.env` entry) falls back to the default
   // instead of being treated as an invalid value.
