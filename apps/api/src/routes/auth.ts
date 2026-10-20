@@ -51,7 +51,7 @@ authRouter.post(
       const registrationMode = getEnv().REGISTRATION_MODE as RegistrationMode;
 
       // 3. Validate access based on the selected mode (public, waiting_list, invite_code, paid_required)
-      const accessPolicy = validateRegistrationAccess({
+      const accessPolicy = await validateRegistrationAccess({
         mode: registrationMode,
         email: normalizedEmail,
         inviteCode: body.inviteCode,

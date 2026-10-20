@@ -1,60 +1,27 @@
-import { type Env, ForbiddenError, ValidationError } from "@opensaas/core";
-
-export type RegistrationMode = Env["REGISTRATION_MODE"];
-
-export interface RegistrationContext {
-  mode: RegistrationMode;
-  email: string;
-  inviteCode?: string;
-  hasPaid?: boolean;
-}
+import { createStrategyRegistry } from "./registration/registry-factory";
+import type { RegistrationContext } from "./registration/types";
 
 /**
- * Validates whether a user can register based on the configured registration mode.
- * Throws appropriate domain errors if constraints are not met.
+ * @deprecated Behavioral shim for the pre-§3.3 switch. It delegates to the
+ * default strategy registry (deny-by-default ports) so callers migrate to the
+ * registry incrementally; the register route moves onto the registry in §3.2.
+ * Prefer `createStrategyRegistry` + `strategy.validate(context)` directly.
  */
-export function validateRegistrationAccess(context: RegistrationContext): {
-  status: "active" | "waitlist";
-} {
-  const mode = context.mode ?? "public";
+export type LegacyRegistrationContext = RegistrationContext & {
+  hasPaid?: boolean;
+};
 
-  switch (mode) {
-    case "public":
-      // Public mode allows instant access
-      return { status: "active" };
-
-    case "waiting_list":
-      // Waiting list mode registers the user but assigns them to a waitlist status
-      return { status: "waitlist" };
-
-    case "invite_code":
-      if (!context.inviteCode || context.inviteCode.trim() === "") {
-        throw new ValidationError(
-          "An invitation code is required to register.",
-          {
-            field: "inviteCode",
-            code: "INVITE_CODE_REQUIRED",
-          },
-        );
-      }
-      // Here you would typically validate the code against database repository
-      return { status: "active" };
-
-    case "paid_required":
-      if (!context.hasPaid) {
-        throw new ForbiddenError(
-          "A completed payment or active checkout session is required to register.",
-          {
-            code: "PAYMENT_REQUIRED",
-          },
-        );
-      }
-      return { status: "active" };
-
-    default:
-      throw new ValidationError(`Unsupported registration mode: ${mode}`, {
-        field: "mode",
-        code: "INVALID_REGISTRATION_MODE",
-      });
-  }
+/**
+ * @deprecated Delegates to the default registry. Invite/payment modes are
+ * deny-by-default, so callers that used to pass a client-trusted `hasPaid`
+ * flag or any non-empty invite code will now be refused — this is the intended
+ * §3.2 hardening.
+ */
+export async function validateRegistrationAccess(
+  context: LegacyRegistrationContext,
+): Promise<{ status: "active" | "waitlist" }> {
+  const registry = createStrategyRegistry();
+  const strategy = registry.require(context.mode);
+  const outcome = await strategy.validate(context);
+  return { status: outcome.status };
 }
