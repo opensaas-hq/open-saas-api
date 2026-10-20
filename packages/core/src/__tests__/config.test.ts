@@ -52,11 +52,11 @@ describe("@opensaas/core - Config", () => {
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error.issues[0]?.path).toEqual(["REGISTRATION_MODE"]);
-      expect(result.error.issues[0]?.message).toContain("'public'");
-      expect(result.error.issues[0]?.message).toContain("'waiting_list'");
-      expect(result.error.issues[0]?.message).toContain("'invite_code'");
-      expect(result.error.issues[0]?.message).toContain("'paid_required'");
-      expect(result.error.issues[0]?.message).toContain("received 'bogus'");
+      const message = result.error.issues[0]?.message ?? "";
+      expect(message).toContain("public");
+      expect(message).toContain("waiting_list");
+      expect(message).toContain("invite_code");
+      expect(message).toContain("paid_required");
     });
 
     test("an empty value falls back to the default (public)", () => {
@@ -116,7 +116,7 @@ describe("@opensaas/core - Config", () => {
       expect(report).toContain("Invalid or missing environment variables");
       expect(report).toContain("DATABASE_URL:");
       expect(report).toContain("REGISTRATION_MODE:");
-      expect(report).toContain("'public'");
+      expect(report).toContain("public");
     });
   });
 
@@ -187,7 +187,7 @@ describe("@opensaas/core - Config", () => {
 
       expect(code).toBe(1);
       expect(stderr).toContain("REGISTRATION_MODE");
-      expect(stderr).toContain("'invite_code'");
+      expect(stderr).toContain("invite_code");
     });
 
     test("a non-postgres DATABASE_URL aborts boot naming the variable", async () => {

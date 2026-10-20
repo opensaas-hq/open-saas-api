@@ -26,17 +26,20 @@ export const envSchema = z.object({
     .default("info"),
   DATABASE_URL: z
     .string()
-    .url("DATABASE_URL must be a valid PostgreSQL connection string")
     // Require a postgres scheme so typos (`postgresl://`, `http://`) fail at
     // boot instead of at connect time with a less actionable message.
     .regex(
       /^postgres(ql)?:\/\//,
       "DATABASE_URL must be a PostgreSQL connection string (scheme postgres:// or postgresql://)",
-    ),
+    )
+    // Then require a well-formed URL, so malformed remainder fails here too.
+    .refine((value) => z.url().safeParse(value).success, {
+      message: "DATABASE_URL must be a valid PostgreSQL connection string",
+    }),
   BETTER_AUTH_SECRET: z
     .string()
     .min(32, "BETTER_AUTH_SECRET must be at least 32 characters"),
-  BETTER_AUTH_URL: z.string().url("BETTER_AUTH_URL must be a valid URL"),
+  BETTER_AUTH_URL: z.url("BETTER_AUTH_URL must be a valid URL"),
   DISPOSABLE_EMAIL_DOMAINS: z.string().optional(),
   // An empty string (e.g. an unset `.env` entry) falls back to the default
   // instead of being treated as an invalid value.

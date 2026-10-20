@@ -4,12 +4,16 @@ import {
   validateAndNormalizeEmail,
   validateRegistrationAccess,
 } from "@opensaas/auth";
+import { fail, fromZodError, statusFromError } from "@opensaas/core";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 
-const registerSchema = z.object({
-  email: z.string().trim().email(),
+/** Request schema for registration. Exported for direct unit testing. */
+export const registerSchema = z.object({
+  // Trim first, then validate the email format (Zod 4: `z.email()` checks
+  // before a chained `.trim()`, so pipe the trimmed string into it).
+  email: z.string().trim().pipe(z.email()),
   password: z.string().min(8),
   name: z.string().min(1),
   inviteCode: z.string().optional(),
@@ -22,16 +26,10 @@ authRouter.post(
   "/register",
   zValidator("json", registerSchema, (result, c) => {
     if (!result.success) {
+      const error = fromZodError(result.error, "Invalid registration payload");
       return c.json(
-        {
-          success: false,
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "Invalid registration payload",
-            details: result.error.format(),
-          },
-        },
-        422,
+        fail(error),
+        statusFromError(error) as ContentfulStatusCode,
       );
     }
   }),

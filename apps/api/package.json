@@ -10,10 +10,11 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@hono/zod-validator": "^0.4.2",
+    "@hono/zod-validator": "^0.9.1",
     "@opensaas/core": "workspace:*",
     "@opensaas/database": "workspace:*",
     "@opensaas/auth": "workspace:*",
-    "hono": "^4.6.11"
+    "hono": "^4.6.11",
+    "zod": "^4.6.7"
   }
 }

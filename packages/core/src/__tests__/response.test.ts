@@ -78,7 +78,7 @@ describe("@opensaas/core - Response envelope", () => {
 
   describe("fromZodError", () => {
     test("maps a ZodError to a 422 ValidationError with field details", () => {
-      const schema = z.object({ email: z.string().email() });
+      const schema = z.object({ email: z.email() });
       const result = schema.safeParse({ email: "not-an-email" });
       if (result.success) throw new Error("expected validation to fail");
 
@@ -87,7 +87,8 @@ describe("@opensaas/core - Response envelope", () => {
       expect(error).toBeInstanceOf(ValidationError);
       expect(error.statusCode).toBe(422);
       expect(error.code).toBe("VALIDATION_ERROR");
-      expect(error.details).toHaveProperty("email");
+      const details = error.details as { fieldErrors: Record<string, unknown> };
+      expect(details.fieldErrors).toHaveProperty("email");
     });
   });
 

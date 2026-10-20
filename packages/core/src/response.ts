@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 import { AppError, ValidationError } from "./errors";
 
 /**
@@ -94,13 +94,20 @@ export function fail(
 }
 
 /**
- * Convert a raw `ZodError` into a `ValidationError` (422) carrying field-level
- * details, so validation failures never surface as a 500.
+ * Convert a raw Zod validation error into a `ValidationError` (422) carrying
+ * field-level details, so validation failures never surface as a 500. Typed
+ * against Zod's core error so it accepts errors from both `safeParse` and
+ * middleware like `@hono/zod-validator`. Uses Zod's flattened view, so
+ * `details.fieldErrors` maps each field name to its messages.
  */
 export const fromZodError = (
-  error: z.ZodError,
+  error: z.core.$ZodError,
   message = "Validation failed",
-): ValidationError => new ValidationError(message, error.format());
+): ValidationError =>
+  new ValidationError(
+    message,
+    z.flattenError(error) as unknown as Record<string, unknown>,
+  );
 
 /**
  * Map an error to its HTTP status code: the `AppError` status when available,
