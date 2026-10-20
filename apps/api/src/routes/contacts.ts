@@ -3,6 +3,7 @@ import {
   createContact,
   createContactsBulk,
   getContactsByOrganization,
+  withTransaction,
 } from "@opensaas/database";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -87,13 +88,16 @@ contactsRouter.post("/bulk", async (c) => {
     throw fromZodError(parsed.error, "Invalid bulk contacts data");
   }
 
-  const contactsToInsert = parsed.data.contacts.map((item) => ({
-    ...item,
-    organizationId: tenant.organizationId,
-    branchId: item.branchId || tenant.branchId,
-  }));
-
-  const insertedContacts = await createContactsBulk(contactsToInsert);
+  const insertedContacts = await withTransaction((tx) =>
+    createContactsBulk({
+      organizationId: tenant.organizationId,
+      contacts: parsed.data.contacts.map((item) => ({
+        ...item,
+        branchId: item.branchId || tenant.branchId,
+      })),
+      tx,
+    }),
+  );
 
   return c.json(
     ok({

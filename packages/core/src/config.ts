@@ -36,6 +36,16 @@ export const envSchema = z.object({
     .refine((value) => z.url().safeParse(value).success, {
       message: "DATABASE_URL must be a valid PostgreSQL connection string",
     }),
+  // Dedicated database for integration tests. Optional in every environment;
+  // required only by the database package's test isolation machinery (§2.7),
+  // never read by application code. Must never equal DATABASE_URL.
+  DATABASE_URL_TEST: z
+    .string()
+    .regex(
+      /^postgres(ql)?:\/\//,
+      "DATABASE_URL_TEST must be a PostgreSQL connection string (scheme postgres:// or postgresql://)",
+    )
+    .optional(),
   BETTER_AUTH_SECRET: z
     .string()
     .min(32, "BETTER_AUTH_SECRET must be at least 32 characters"),

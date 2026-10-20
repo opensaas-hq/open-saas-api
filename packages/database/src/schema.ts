@@ -1,11 +1,28 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  index,
   jsonb,
+  pgEnum,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+
+/**
+ * Lifecycle status of a contact. A `pgEnum` (rather than free-form text) makes
+ * an invalid value a database-level error, not a silent application bug.
+ */
+export const contactStatus = pgEnum("contact_status", [
+  "active",
+  "lead",
+  "churned",
+]);
+
+/** Type of a contact status, derived from the enum (single source of truth). */
+export type ContactStatus = (typeof contactStatus.enumValues)[number];
 
 /**
  * Better Auth - Core User Table
@@ -108,7 +125,7 @@ export const organization = pgTable("organization", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   logo: text("logo"),
-  metadata: text("metadata"),
+  metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -117,19 +134,29 @@ export const organization = pgTable("organization", {
 /**
  * Better Auth - Member Plugin Table
  */
-export const member = pgTable("member", {
-  id: text("id").primaryKey(),
-  organizationId: text("organization_id")
-    .references(() => organization.id, { onDelete: "cascade" })
-    .notNull(),
-  userId: text("user_id")
-    .references(() => user.id, { onDelete: "cascade" })
-    .notNull(),
-  role: text("role").default("member").notNull(), // owner, admin, member
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const member = pgTable(
+  "member",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .references(() => organization.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: text("user_id")
+      .references(() => user.id, { onDelete: "cascade" })
+      .notNull(),
+    role: text("role").default("member").notNull(), // owner, admin, member
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    // Tenant-scoped membership lookups (§4.3 cache, RLS in §2.5).
+    index("member_organization_id_user_id_idx").on(
+      table.organizationId,
+      table.userId,
+    ),
+  ],
+);
 
 /**
  * Better Auth - Invitation Plugin Table
@@ -168,24 +195,76 @@ export const branches = pgTable("branches", {
 /**
  * Custom Business Logic - Contacts (CRM Base)
  */
-export const contacts = pgTable("contacts", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  organizationId: text("organization_id")
-    .references(() => organization.id, { onDelete: "cascade" })
-    .notNull(),
-  branchId: uuid("branch_id").references(() => branches.id, {
-    onDelete: "set null",
-  }),
-  name: text("name").notNull(),
-  phone: text("phone"),
-  email: text("email"),
-  status: text("status").default("active").notNull(),
-  optIn: boolean("opt_in").default(true).notNull(),
-  metadata: jsonb("metadata").default({}).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const contacts = pgTable(
+  "contacts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .references(() => organization.id, { onDelete: "cascade" })
+      .notNull(),
+    branchId: uuid("branch_id").references(() => branches.id, {
+      onDelete: "set null",
+    }),
+    name: text("name").notNull(),
+    phone: text("phone"),
+    email: text("email"),
+    status: contactStatus("status").default("active").notNull(),
+    optIn: boolean("opt_in").default(true).notNull(),
+    metadata: jsonb("metadata").default({}).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    // Makes the tenant-filtered list query cheap (§2.2 AC1).
+    index("contacts_organization_id_status_idx").on(
+      table.organizationId,
+      table.status,
+    ),
+    index("contacts_organization_id_branch_id_idx").on(
+      table.organizationId,
+      table.branchId,
+    ),
+    // A contact email is unique per organization, but only when present.
+    uniqueIndex("contacts_organization_id_email_idx")
+      .on(table.organizationId, table.email)
+      .where(sql`${table.email} IS NOT NULL`),
+  ],
+);
+
+/**
+ * Append-only audit trail: who did what, to which entity, within which tenant.
+ * The `jsonb` diff is produced by `@opensaas/core`'s audit helpers and this
+ * table is written through `repositories/audit.ts`, which implements the
+ * `AuditPort` interface (§1.6, §2.2).
+ */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    actorId: text("actor_id").notNull(),
+    organizationId: text("organization_id").notNull(),
+    changes: jsonb("changes"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("audit_log_organization_id_created_at_idx").on(
+      table.organizationId,
+      table.createdAt,
+    ),
+    index("audit_log_entity_type_entity_id_idx").on(
+      table.entityType,
+      table.entityId,
+    ),
+  ],
+);
