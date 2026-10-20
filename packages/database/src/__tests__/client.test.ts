@@ -102,11 +102,17 @@ describe("@opensaas/database - Resilience config", () => {
       DB_BREAKER_ENABLED: false,
       DB_BREAKER_FAILURE_THRESHOLD: 9,
       DB_BREAKER_COOLDOWN_MS: 30_000,
+      DB_BREAKER_PROBE_TIMEOUT_MS: 1_500,
     });
 
     expect(config).toEqual({
       retry: { maxAttempts: 7, baseDelayMs: 50, maxDelayMs: 2_000 },
-      breaker: { enabled: false, failureThreshold: 9, cooldownMs: 30_000 },
+      breaker: {
+        enabled: false,
+        failureThreshold: 9,
+        cooldownMs: 30_000,
+        probeTimeoutMs: 1_500,
+      },
     });
   });
 });

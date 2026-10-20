@@ -36,9 +36,11 @@ export const envSchema = z.object({
     .refine((value) => z.url().safeParse(value).success, {
       message: "DATABASE_URL must be a valid PostgreSQL connection string",
     }),
-  // Dedicated database for integration tests. Optional in every environment;
-  // required only by the database package's test isolation machinery (§2.7),
-  // never read by application code. Must never equal DATABASE_URL.
+  // Dedicated database for integration tests. Under `.env.test`, `DATABASE_URL`
+  // points at this same test database (so they are equal there), always
+  // distinct from development. Optional in every environment; required only by
+  // the database package's test isolation machinery (§2.7), never read by
+  // application code.
   DATABASE_URL_TEST: z
     .string()
     .regex(

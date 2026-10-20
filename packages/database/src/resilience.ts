@@ -80,28 +80,47 @@ export const withRetry = async <T>(
 /** Circuit breaker states. */
 export type BreakerState = "closed" | "open" | "halfOpen";
 
+/** Schedules `callback` after `ms`; injectable so tests skip real timers. */
+export type SetTimer = (callback: () => void, ms: number) => unknown;
+
+/** Cancels a timer created by {@link SetTimer}. */
+export type ClearTimer = (handle: unknown) => void;
+
 /** Options for {@link CircuitBreaker}. */
 export type CircuitBreakerOptions = {
   /** Consecutive failures that trip the breaker from `closed` to `open`. */
   failureThreshold: number;
   /** Milliseconds the breaker stays `open` before allowing a probe. */
   cooldownMs: number;
+  /**
+   * Milliseconds a `halfOpen` recovery probe may run before it is treated as a
+   * failure. Without this, a hung probe would keep the breaker from reopening.
+   */
+  probeTimeoutMs?: number;
   /** Called whenever the state changes (e.g. to publish metrics, §5.6). */
   onStateChange?: (state: BreakerState, previous: BreakerState) => void;
   /** Injected clock for tests. */
   now?: Clock;
+  /** Injected timer for tests. */
+  setTimer?: SetTimer;
+  /** Injected timer canceller for tests. */
+  clearTimer?: ClearTimer;
 };
 
 /**
  * Counts consecutive failures and fails fast while open. After `cooldownMs` it
  * moves to `halfOpen` and lets a single probe through: success closes it,
- * failure reopens it. Deliberately clock-injected so tests are deterministic.
+ * failure (or a probe that exceeds `probeTimeoutMs`) reopens it. Deliberately
+ * clock- and timer-injected so tests are deterministic.
  */
 export class CircuitBreaker {
   private state: BreakerState = "closed";
   private failures = 0;
   private openedAt = 0;
   private readonly now: Clock;
+  private readonly setTimer: SetTimer;
+  private readonly clearTimer: ClearTimer;
+  private readonly probeTimeoutMs: number;
 
   /** Total calls rejected while open (for metrics). */
   public rejected = 0;
@@ -110,6 +129,11 @@ export class CircuitBreaker {
 
   constructor(private readonly options: CircuitBreakerOptions) {
     this.now = options.now ?? Date.now;
+    this.setTimer =
+      options.setTimer ?? ((callback, ms) => setTimeout(callback, ms));
+    this.clearTimer =
+      options.clearTimer ?? ((handle) => clearTimeout(handle as never));
+    this.probeTimeoutMs = options.probeTimeoutMs ?? 2_000;
   }
 
   /** Current state, advancing `open` → `halfOpen` once the cooldown elapsed. */
@@ -135,13 +159,40 @@ export class CircuitBreaker {
     }
 
     try {
-      const result = await operation();
+      const result =
+        state === "halfOpen"
+          ? await this.runProbe(operation)
+          : await operation();
       this.onSuccess();
       return result;
     } catch (error) {
       this.onFailure();
       throw error;
     }
+  }
+
+  /**
+   * Run the single half-open recovery probe under `probeTimeoutMs`. A hung
+   * probe must not pin the breaker open forever: on timeout it rejects so
+   * `onFailure` reopens the breaker.
+   */
+  private runProbe<T>(operation: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const handle = this.setTimer(() => {
+        reject(new Error("circuit breaker probe timed out"));
+      }, this.probeTimeoutMs);
+
+      operation().then(
+        (result) => {
+          this.clearTimer(handle);
+          resolve(result);
+        },
+        (error) => {
+          this.clearTimer(handle);
+          reject(error);
+        },
+      );
+    });
   }
 
   private onSuccess(): void {

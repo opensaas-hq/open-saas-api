@@ -273,4 +273,67 @@ describe("@opensaas/database - CircuitBreaker", () => {
     expect(breaker.getState()).toBe("open");
     expect(breaker.trips).toBe(2);
   });
+
+  test("reopens when the half-open probe exceeds probeTimeoutMs", async () => {
+    let clock = 0;
+    // Capture the probe timer so the test can fire it on demand, without
+    // waiting on real time.
+    let fireProbeTimeout: (() => void) | undefined;
+    const breaker = new CircuitBreaker({
+      failureThreshold: 1,
+      cooldownMs: 1_000,
+      probeTimeoutMs: 500,
+      now: () => clock,
+      setTimer: (callback) => {
+        fireProbeTimeout = callback;
+        return 1;
+      },
+      clearTimer: () => {},
+    });
+
+    await expect(
+      breaker.execute(() => Promise.reject(transientError())),
+    ).rejects.toThrow();
+    expect(breaker.getState()).toBe("open");
+
+    clock += 1_000;
+    expect(breaker.getState()).toBe("halfOpen");
+
+    // A probe that never settles: the injected timer fires and the breaker
+    // treats the hung probe as a failure, reopening instead of staying stuck.
+    const hungProbe = breaker.execute(() => new Promise<never>(() => {}));
+
+    expect(fireProbeTimeout).toBeDefined();
+    fireProbeTimeout?.();
+
+    await expect(hungProbe).rejects.toThrow("probe timed out");
+    expect(breaker.getState()).toBe("open");
+    expect(breaker.trips).toBe(2);
+  });
+
+  test("a half-open probe that settles in time cancels the timeout and closes", async () => {
+    let clock = 0;
+    const cleared: unknown[] = [];
+    const breaker = new CircuitBreaker({
+      failureThreshold: 1,
+      cooldownMs: 1_000,
+      probeTimeoutMs: 500,
+      now: () => clock,
+      // The timer is never fired: success must clear it and close the breaker.
+      setTimer: () => 7,
+      clearTimer: (handle) => cleared.push(handle),
+    });
+
+    await expect(
+      breaker.execute(() => Promise.reject(transientError())),
+    ).rejects.toThrow();
+
+    clock += 1_000;
+    expect(breaker.getState()).toBe("halfOpen");
+
+    const result = await breaker.execute(() => Promise.resolve("recovered"));
+    expect(result).toBe("recovered");
+    expect(breaker.getState()).toBe("closed");
+    expect(cleared).toEqual([7]);
+  });
 });

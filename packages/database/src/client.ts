@@ -82,6 +82,7 @@ export type DbResilienceConfig = {
     enabled: boolean;
     failureThreshold: number;
     cooldownMs: number;
+    probeTimeoutMs: number;
   };
 };
 
@@ -93,6 +94,7 @@ export const buildResilienceConfig = (env: {
   DB_BREAKER_ENABLED: boolean;
   DB_BREAKER_FAILURE_THRESHOLD: number;
   DB_BREAKER_COOLDOWN_MS: number;
+  DB_BREAKER_PROBE_TIMEOUT_MS: number;
 }): DbResilienceConfig => ({
   retry: {
     maxAttempts: env.DB_RETRY_MAX_ATTEMPTS,
@@ -103,6 +105,7 @@ export const buildResilienceConfig = (env: {
     enabled: env.DB_BREAKER_ENABLED,
     failureThreshold: env.DB_BREAKER_FAILURE_THRESHOLD,
     cooldownMs: env.DB_BREAKER_COOLDOWN_MS,
+    probeTimeoutMs: env.DB_BREAKER_PROBE_TIMEOUT_MS,
   },
 });
 
@@ -141,6 +144,7 @@ export const getBreaker = (): CircuitBreaker => {
     breaker = new CircuitBreaker({
       failureThreshold: config.breaker.failureThreshold,
       cooldownMs: config.breaker.cooldownMs,
+      probeTimeoutMs: config.breaker.probeTimeoutMs,
     });
   }
   return breaker;
