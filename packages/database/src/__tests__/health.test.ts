@@ -11,7 +11,7 @@ describe("@opensaas/database - Health probe", () => {
 
   test("returns false when the probe exceeds the timeout", async () => {
     // A probe that never resolves must be reported as down once the timeout
-    // elapses, proving the result depends on the real probe, not on NODE_ENV.
+    // elapses, proving the result depends on the real probe and not a stub.
     const hung = {
       execute: () => new Promise<never>(() => {}),
     };

@@ -21,6 +21,17 @@ const required = <T>(value: T | undefined): T => {
   return value;
 };
 
+// Type-level enforcement (§2.1 AC2): `organizationId` is required, so omitting
+// it is a compile error. @ts-expect-error fails the build if the argument ever
+// becomes optional.
+const _typeChecks = () => {
+  // @ts-expect-error organizationId is required
+  void listBranches({});
+  // @ts-expect-error organizationId is required
+  void createBranch({ name: "Main" });
+};
+void _typeChecks;
+
 describe("@opensaas/database - Branch repository", () => {
   const suffix = Date.now().toString();
 

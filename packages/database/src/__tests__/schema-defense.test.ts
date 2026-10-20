@@ -103,4 +103,18 @@ describe("@opensaas/database - Schema defense in depth", () => {
 
     expect(row?.metadata).toEqual(metadata);
   });
+
+  test("the tenant-filtered list query uses a tenant index", async () => {
+    // Regression guard for §2.2: the hot path (`WHERE organization_id = $1
+    // [AND status = …]`) must be servable by one of the tenant indexes, never a
+    // sequential scan. Assert on the plan text rather than a cost estimate.
+    const plan = await db.execute(sql`
+      EXPLAIN SELECT * FROM contacts
+      WHERE organization_id = ${`org_${suffix}`} AND status = 'active'
+    `);
+
+    const planText = plan.map((row) => String(row["QUERY PLAN"])).join("\n");
+    expect(planText).toContain("Index");
+    expect(planText).not.toContain("Seq Scan");
+  });
 });

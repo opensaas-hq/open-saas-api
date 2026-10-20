@@ -201,14 +201,14 @@ export const executeResilient = async <T>(
  * instead of a raw driver message.
  */
 export const waitForDatabase = async (
-  deps: ResilientDeps = {},
+  deps: ResilientDeps & { probe?: () => Promise<unknown> } = {},
 ): Promise<void> => {
   const env = getEnv();
   const config = buildResilienceConfig(env);
-  const client = getDb().$client;
+  const probe = deps.probe ?? (() => getDb().$client`SELECT 1`);
 
   try {
-    await withRetry(() => client`SELECT 1`, {
+    await withRetry(() => probe(), {
       maxAttempts: config.retry.maxAttempts,
       baseDelayMs: config.retry.baseDelayMs,
       maxDelayMs: config.retry.maxDelayMs,

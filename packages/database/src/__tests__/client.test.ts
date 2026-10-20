@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { ServiceUnavailableError, getEnv } from "@opensaas/core";
 import {
   buildPoolConfig,
   buildResilienceConfig,
@@ -115,6 +116,46 @@ describe("@opensaas/database - Resilient execution", () => {
 
   test("waitForDatabase resolves against a live database", async () => {
     await expect(waitForDatabase()).resolves.toBeUndefined();
+  });
+
+  test("waitForDatabase retries a transient failure then fails with a typed 503", async () => {
+    let attempts = 0;
+    const transient = () =>
+      Object.assign(new Error("connection refused"), { code: "08006" });
+
+    const failure = waitForDatabase({
+      sleeper: () => Promise.resolve(),
+      random: () => 0,
+      probe: () => {
+        attempts++;
+        return Promise.reject(transient());
+      },
+    });
+
+    await expect(failure).rejects.toBeInstanceOf(ServiceUnavailableError);
+
+    // Bounded: exactly the configured number of attempts, all retried because
+    // the startup probe is idempotent.
+    const env = getEnv();
+    expect(attempts).toBe(env.DB_RETRY_MAX_ATTEMPTS);
+  });
+
+  test("waitForDatabase does not wrap a permanent error as transient", async () => {
+    const permanent = () =>
+      Object.assign(new Error("syntax error"), { code: "42601" });
+    let attempts = 0;
+
+    const failure = waitForDatabase({
+      sleeper: () => Promise.resolve(),
+      random: () => 0,
+      probe: () => {
+        attempts++;
+        return Promise.reject(permanent());
+      },
+    });
+
+    await expect(failure).rejects.toBeInstanceOf(ServiceUnavailableError);
+    expect(attempts).toBe(1);
   });
 
   test("executeResilient runs an idempotent read", async () => {
