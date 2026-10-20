@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { initConfig } from "@opensaas/core";
 import app from "../index";
+import { registerSchema } from "../routes/auth";
 
 // The route reads the registration mode from validated config, so tests inject
 // it through `initConfig` instead of mutating `process.env` between cases.
@@ -89,5 +90,25 @@ describe("Apps/API - Auth Registration Integration Routes (/api/auth/register)",
     });
 
     expect(res.status).toBe(422);
+  });
+
+  // §3.2 AC1: no field in the register DTO can assert payment. A client sending
+  // `hasPaid: true` cannot make it part of the parsed payload.
+  test("the register DTO has no payment field a client could assert", () => {
+    const parsed = registerSchema.safeParse({
+      email: "user@example.com",
+      password: "password123",
+      name: "User",
+      hasPaid: true,
+      paid: true,
+      paymentReference: "anything",
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data).not.toHaveProperty("hasPaid");
+      expect(parsed.data).not.toHaveProperty("paid");
+      expect(parsed.data).not.toHaveProperty("paymentReference");
+    }
   });
 });

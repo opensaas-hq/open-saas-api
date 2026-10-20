@@ -1,8 +1,9 @@
 import { zValidator } from "@hono/zod-validator";
 import {
   type RegistrationMode,
+  createDatabaseInviteCodeValidator,
+  createStrategyRegistry,
   validateAndNormalizeEmail,
-  validateRegistrationAccess,
 } from "@opensaas/auth";
 import {
   fail,
@@ -15,7 +16,13 @@ import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 
-/** Request schema for registration. Exported for direct unit testing. */
+/**
+ * Request schema for registration. Exported for direct unit testing.
+ *
+ * Deliberately has **no** payment field: a client can never assert that it has
+ * paid (§3.2). Payment, when required, is verified server-side through the
+ * `PaymentVerificationPort`.
+ */
 export const registerSchema = z.object({
   // Trim first, then validate the email format (Zod 4: `z.email()` checks
   // before a chained `.trim()`, so pipe the trimmed string into it).
@@ -23,7 +30,13 @@ export const registerSchema = z.object({
   password: z.string().min(8),
   name: z.string().min(1),
   inviteCode: z.string().optional(),
-  hasPaid: z.boolean().optional(),
+});
+
+// Strategies are stateless; one registry per process is enough. Invite codes
+// are validated against the database; payment verification stays
+// deny-by-default until a provider is integrated (§3.2).
+const registrationRegistry = createStrategyRegistry({
+  inviteCodes: createDatabaseInviteCodeValidator(),
 });
 
 export const authRouter = new Hono();
@@ -50,21 +63,24 @@ authRouter.post(
       //    (never raw `process.env`; an invalid value already failed at boot).
       const registrationMode = getEnv().REGISTRATION_MODE as RegistrationMode;
 
-      // 3. Validate access based on the selected mode (public, waiting_list, invite_code, paid_required)
-      const accessPolicy = await validateRegistrationAccess({
-        mode: registrationMode,
-        email: normalizedEmail,
-        inviteCode: body.inviteCode,
-        hasPaid: body.hasPaid,
-      });
+      // 3. Resolve the mode's strategy and validate server-side. The strategy
+      //    owns the mode's constraint (invite code checked against the DB,
+      //    payment verified through the port) — request flags are never trusted.
+      const outcome = await registrationRegistry
+        .require(registrationMode)
+        .validate({
+          mode: registrationMode,
+          email: normalizedEmail,
+          inviteCode: body.inviteCode,
+        });
 
       // 4. Return the registration result in the standard envelope.
       return c.json(
         ok({
           email: normalizedEmail,
-          status: accessPolicy.status,
+          status: outcome.status,
           message:
-            accessPolicy.status === "waitlist"
+            outcome.status === "waitlist"
               ? "Registration received. You have been added to the waitlist."
               : "Registration successful.",
         }),

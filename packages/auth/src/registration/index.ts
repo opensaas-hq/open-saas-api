@@ -5,3 +5,4 @@ export * from "./strategies/public";
 export * from "./strategies/waiting-list";
 export * from "./strategies/invite-code";
 export * from "./strategies/paid-required";
+export * from "./validators/database-invite-code";
