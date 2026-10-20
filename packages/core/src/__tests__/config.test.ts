@@ -29,6 +29,7 @@ describe("@opensaas/core - Config", () => {
       expect(result.data.LOG_LEVEL).toBe("info");
       expect(result.data.REGISTRATION_MODE).toBe("public");
       expect(result.data.DISPOSABLE_EMAIL_DOMAINS).toBeUndefined();
+      expect(result.data.RLS_ENABLED).toBe(false);
     });
   });
 
@@ -69,6 +70,32 @@ describe("@opensaas/core - Config", () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
       expect(result.data.REGISTRATION_MODE).toBe("public");
+    });
+  });
+
+  describe("RLS_ENABLED", () => {
+    test("defaults to false", () => {
+      const result = envSchema.safeParse(validEnv);
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.RLS_ENABLED).toBe(false);
+    });
+
+    test('"true" is coerced to a boolean', () => {
+      const result = envSchema.safeParse({ ...validEnv, RLS_ENABLED: "true" });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.RLS_ENABLED).toBe(true);
+    });
+
+    test("an unknown value fails naming the variable", () => {
+      const result = envSchema.safeParse({ ...validEnv, RLS_ENABLED: "yes" });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.issues[0]?.path).toEqual(["RLS_ENABLED"]);
     });
   });
 

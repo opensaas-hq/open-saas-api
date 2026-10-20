@@ -75,6 +75,15 @@ export const envSchema = z.object({
     .int()
     .positive()
     .default(2_000),
+  // Postgres Row-Level Security (§2.5). This is a runtime behavioral switch,
+  // not a migration gate: when on, the client connects as the dedicated
+  // `opensaas_app` role and every tenant-scoped transaction sets the
+  // `app.current_org` GUC. Off in local development until the application-layer
+  // adoption lands; on in the RLS test job. See docs/architecture/multitenancy.md.
+  RLS_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
   DISPOSABLE_EMAIL_DOMAINS: z.string().optional(),
   // An empty string (e.g. an unset `.env` entry) falls back to the default
   // instead of being treated as an invalid value.
