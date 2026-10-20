@@ -1,9 +1,12 @@
 import {
-  type ApiResponse,
   AppError,
+  NotFoundError,
+  fail,
   getEnv,
   getLogger,
   initConfig,
+  ok,
+  statusFromError,
 } from "@opensaas/core";
 import { checkDatabaseHealth } from "@opensaas/database";
 import { Hono } from "hono";
@@ -33,21 +36,25 @@ app.get("/api/health", async (c) => {
   const statusCode = isDbConnected ? 200 : 503;
 
   return c.json(
-    {
-      success: isDbConnected,
-      data: {
-        status: isDbConnected ? "ok" : "degraded",
-        environment: env.NODE_ENV,
-        database: isDbConnected ? "connected" : "disconnected",
-        timestamp: new Date().toISOString(),
-      },
-    },
+    ok({
+      status: isDbConnected ? "ok" : "degraded",
+      environment: env.NODE_ENV,
+      database: isDbConnected ? "connected" : "disconnected",
+      timestamp: new Date().toISOString(),
+    }),
     statusCode as ContentfulStatusCode,
   );
 });
 
 app.route("/api/auth", authRouter);
 app.route("/api/contacts", contactsRouter);
+
+// Unknown routes still answer with the JSON envelope instead of Hono's
+// plain-text default, keeping the response contract intact.
+app.notFound((c) => {
+  const error = new NotFoundError("Route not found", { path: c.req.path });
+  return c.json(fail(error), 404);
+});
 
 app.onError((err, c) => {
   if (err instanceof AppError) {
@@ -59,29 +66,14 @@ app.onError((err, c) => {
       path: c.req.path,
     });
 
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: err.code,
-          message: err.message,
-          details: err.details,
-        },
-      },
-      err.statusCode as ContentfulStatusCode,
-    );
+    return c.json(fail(err), statusFromError(err) as ContentfulStatusCode);
   }
 
   logger.error(err, "Unhandled server error");
 
+  // Unknown errors never leak internals: no details, generic message.
   return c.json(
-    {
-      success: false,
-      error: {
-        code: "INTERNAL_SERVER_ERROR",
-        message: "An unexpected error occurred",
-      },
-    },
+    fail("INTERNAL_SERVER_ERROR", "An unexpected error occurred"),
     500,
   );
 });

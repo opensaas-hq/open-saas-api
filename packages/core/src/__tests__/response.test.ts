@@ -90,6 +90,23 @@ describe("@opensaas/core - Response envelope", () => {
       const details = error.details as { fieldErrors: Record<string, unknown> };
       expect(details.fieldErrors).toHaveProperty("email");
     });
+
+    test("uses the provided message and exposes flattened fieldErrors", () => {
+      const schema = z.object({
+        email: z.email(),
+        age: z.number().min(18),
+      });
+      const result = schema.safeParse({ email: "bad", age: 10 });
+      if (result.success) throw new Error("expected validation to fail");
+
+      const error = fromZodError(result.error, "Invalid payload");
+      const details = error.details as { fieldErrors: Record<string, unknown> };
+
+      expect(error.message).toBe("Invalid payload");
+      expect(Object.keys(details.fieldErrors)).toEqual(
+        expect.arrayContaining(["email", "age"]),
+      );
+    });
   });
 
   describe("statusFromError", () => {

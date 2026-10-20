@@ -18,30 +18,13 @@ export type SensitiveKey = (typeof SENSITIVE_KEYS)[number];
 export const REDACTED = "[REDACTED]";
 
 /**
- * Serialize a set of sensitive keys into pino `redact` paths. We enumerate the
- * common nesting depths explicitly because pino's path syntax has no "any
- * depth" wildcard; this keeps redaction declarative and testable.
- */
-export const REDACT_PATHS: string[] = (() => {
-  const paths: string[] = [];
-  for (const key of SENSITIVE_KEYS) {
-    paths.push(
-      key,
-      `*.${key}`,
-      `*.*.${key}`,
-      `req.headers.${key}`,
-      `res.headers.${key}`,
-    );
-  }
-  return paths;
-})();
-
-/**
  * Redact sensitive keys from a plain object, recursively, returning a new
- * value and never mutating the input. Unlike pino's `redact` (which rewrites
- * paths before serialization), this is a pure function so non-logger consumers
- * — the audit diff — can reuse the exact same rules.
+ * value and never mutating the input. This is the single redaction mechanism:
+ * the logger applies it in pino's `formatters.log` hook, and non-logger
+ * consumers — the audit diff — reuse the exact same rules.
  *
+ * Matching is case-insensitive and applies at any depth, so `Authorization`,
+ * `Set-Cookie`, `req.headers.authorization` and nested payloads are covered.
  * Arrays are preserved as arrays; cycles are handled by tracking visited
  * objects so a self-referencing payload cannot loop forever.
  */

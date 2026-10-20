@@ -7,6 +7,7 @@ import {
   formatEnvError,
   getEnv,
   initConfig,
+  resetConfig,
 } from "../config";
 
 // Minimal valid configuration reused across the schema assertions below.
@@ -99,6 +100,59 @@ describe("@opensaas/core - Config", () => {
     });
   });
 
+  describe("required and bounded variables", () => {
+    test("a missing DATABASE_URL fails naming the variable", () => {
+      const { DATABASE_URL: _omitted, ...withoutDb } = validEnv;
+      const result = envSchema.safeParse(withoutDb);
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.issues.map((i) => i.path.join("."))).toContain(
+        "DATABASE_URL",
+      );
+    });
+
+    test("a BETTER_AUTH_SECRET shorter than 32 characters fails", () => {
+      const result = envSchema.safeParse({
+        ...validEnv,
+        BETTER_AUTH_SECRET: "short",
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.issues[0]?.path).toEqual(["BETTER_AUTH_SECRET"]);
+    });
+
+    test("a malformed BETTER_AUTH_URL fails", () => {
+      const result = envSchema.safeParse({
+        ...validEnv,
+        BETTER_AUTH_URL: "not-a-url",
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.issues[0]?.path).toEqual(["BETTER_AUTH_URL"]);
+    });
+
+    test("PORT is coerced to a number and a non-numeric value fails", () => {
+      const okResult = envSchema.safeParse({ ...validEnv, PORT: "8080" });
+      expect(okResult.success).toBe(true);
+      if (okResult.success) expect(okResult.data.PORT).toBe(8080);
+
+      const badResult = envSchema.safeParse({ ...validEnv, PORT: "abc" });
+      expect(badResult.success).toBe(false);
+    });
+
+    test("a well-formed postgres URL passes both scheme and URL checks", () => {
+      const result = envSchema.safeParse({
+        ...validEnv,
+        DATABASE_URL: "postgres://user:pass@db.example.com:5432/app",
+      });
+
+      expect(result.success).toBe(true);
+    });
+  });
+
   describe("formatEnvError", () => {
     test("names every invalid variable and lists its allowed values", () => {
       const result = envSchema.safeParse({
@@ -137,10 +191,20 @@ describe("@opensaas/core - Config", () => {
     });
 
     test("getEnv returns the parsed environment", () => {
+      resetConfig();
       const env = getEnv(validEnv);
 
       expect(env.PORT).toBeGreaterThan(0);
       expect(env.REGISTRATION_MODE).toBe("public");
+    });
+
+    test("getEnv memoizes: a second call ignores a different source", () => {
+      resetConfig();
+      const first = getEnv(validEnv);
+      const second = getEnv({ ...validEnv, REGISTRATION_MODE: "waiting_list" });
+
+      expect(first.REGISTRATION_MODE).toBe("public");
+      expect(second).toBe(first);
     });
 
     test("initConfig returns the parsed environment for a valid source", () => {
@@ -188,6 +252,15 @@ describe("@opensaas/core - Config", () => {
       expect(code).toBe(1);
       expect(stderr).toContain("REGISTRATION_MODE");
       expect(stderr).toContain("invite_code");
+    });
+
+    test("the boot failure is reported as a single structured JSON line", async () => {
+      const { stderr } = await bootWith({ REGISTRATION_MODE: "bogus" });
+
+      const entry = JSON.parse(stderr.trim());
+      expect(entry.name).toBe("ConfigError");
+      expect(entry.msg).toContain("Invalid or missing environment variables");
+      expect(entry.report).toContain("REGISTRATION_MODE");
     });
 
     test("a non-postgres DATABASE_URL aborts boot naming the variable", async () => {

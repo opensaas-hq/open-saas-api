@@ -107,8 +107,22 @@ export const getEnv = (source: Record<string, unknown> = process.env): Env => {
 };
 
 /**
+ * Test seam: drop the memoized environment so the next {@link getEnv} /
+ * {@link initConfig} re-parses from the provided source. Keeps config tests
+ * order-independent; production code never needs this.
+ */
+export const resetConfig = (): void => {
+  cachedEnv = undefined;
+};
+
+/**
  * Explicit boot initializer. This is the only place allowed to terminate the
- * process: it prints the formatted report and exits when config is invalid.
+ * process: it reports the failure and exits when config is invalid.
+ *
+ * The report is emitted to stderr as a single structured JSON line (the same
+ * shape as the logger's output) so boot failures are machine-readable. A pino
+ * logger cannot be used here: constructing it needs a valid `env`, which is
+ * exactly what failed.
  */
 export const initConfig = (
   source: Record<string, unknown> = process.env,
@@ -119,7 +133,14 @@ export const initConfig = (
   } catch (error) {
     if (error instanceof ConfigError) {
       // Boot only: surface the report and stop before the app starts.
-      console.error(error.report);
+      const bootFailure = {
+        level: 60,
+        name: "ConfigError",
+        msg: "Invalid or missing environment variables",
+        report: error.report,
+        time: Date.now(),
+      };
+      process.stderr.write(`${JSON.stringify(bootFailure)}\n`);
       process.exit(1);
     }
     throw error;

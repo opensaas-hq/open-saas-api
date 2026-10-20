@@ -13,6 +13,19 @@ describe("Apps/API - Contacts Routes (/api/contacts)", () => {
     expect(body.error.code).toBe("UNAUTHORIZED");
   });
 
+  test("GET /api/contacts with a bad query still requires auth first (401)", async () => {
+    // The tenant middleware runs before validation, so an unauthenticated
+    // caller gets the 401 envelope regardless of query shape.
+    const res = await app.fetch(
+      new Request("http://localhost/api/contacts?limit=abc"),
+    );
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.success).toBe(false);
+    expect(body.error).toHaveProperty("code");
+  });
+
   test("POST /api/contacts - should reject invalid payloads (validation error)", async () => {
     const req = new Request("http://localhost/api/contacts", {
       method: "POST",

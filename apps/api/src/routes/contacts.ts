@@ -1,4 +1,4 @@
-import { ValidationError } from "@opensaas/core";
+import { fromZodError, ok } from "@opensaas/core";
 import {
   createContact,
   createContactsBulk,
@@ -36,18 +36,20 @@ export const contactsQuerySchema = z.object({
 // GET /api/contacts
 contactsRouter.get("/", async (c) => {
   const tenant = c.get("tenant");
-  const query = contactsQuerySchema.parse(c.req.query());
+
+  // Validate untrusted query params with safeParse so a bad value surfaces as a
+  // 422 ValidationError (via the single error serializer), never a 500.
+  const parsed = contactsQuerySchema.safeParse(c.req.query());
+  if (!parsed.success) {
+    throw fromZodError(parsed.error, "Invalid contact query parameters");
+  }
 
   const result = await getContactsByOrganization({
     organizationId: tenant.organizationId,
-    ...query,
+    ...parsed.data,
   });
 
-  return c.json({
-    success: true,
-    data: result.items,
-    pagination: result.pagination,
-  });
+  return c.json(ok(result.items, result.pagination));
 });
 
 // POST /api/contacts
@@ -57,7 +59,7 @@ contactsRouter.post("/", async (c) => {
 
   const parsed = createContactSchema.safeParse(body);
   if (!parsed.success) {
-    throw new ValidationError("Invalid contact data", parsed.error.format());
+    throw fromZodError(parsed.error, "Invalid contact data");
   }
 
   const newContact = await createContact({
@@ -66,13 +68,7 @@ contactsRouter.post("/", async (c) => {
     branchId: parsed.data.branchId || tenant.branchId,
   });
 
-  return c.json(
-    {
-      success: true,
-      data: newContact,
-    },
-    201,
-  );
+  return c.json(ok(newContact), 201);
 });
 
 // POST /api/contacts/bulk
@@ -88,10 +84,7 @@ contactsRouter.post("/bulk", async (c) => {
 
   const parsed = bulkContactSchema.safeParse(body);
   if (!parsed.success) {
-    throw new ValidationError(
-      "Invalid bulk contacts data",
-      parsed.error.format(),
-    );
+    throw fromZodError(parsed.error, "Invalid bulk contacts data");
   }
 
   const contactsToInsert = parsed.data.contacts.map((item) => ({
@@ -103,13 +96,10 @@ contactsRouter.post("/bulk", async (c) => {
   const insertedContacts = await createContactsBulk(contactsToInsert);
 
   return c.json(
-    {
-      success: true,
-      data: {
-        count: insertedContacts.length,
-        contacts: insertedContacts,
-      },
-    },
+    ok({
+      count: insertedContacts.length,
+      contacts: insertedContacts,
+    }),
     201,
   );
 });

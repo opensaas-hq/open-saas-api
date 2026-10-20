@@ -4,7 +4,13 @@ import {
   validateAndNormalizeEmail,
   validateRegistrationAccess,
 } from "@opensaas/auth";
-import { fail, fromZodError, statusFromError } from "@opensaas/core";
+import {
+  fail,
+  fromZodError,
+  getEnv,
+  ok,
+  statusFromError,
+} from "@opensaas/core";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
@@ -40,11 +46,9 @@ authRouter.post(
       // 1. Enforce email anti-abuse and normalization policy
       const normalizedEmail = validateAndNormalizeEmail(body.email);
 
-      // 2. Determine system registration mode from environment configuration
-      const envMode = process.env.REGISTRATION_MODE;
-      const registrationMode = (
-        !envMode || envMode === "undefined" ? "public" : envMode
-      ) as RegistrationMode;
+      // 2. Determine system registration mode from validated configuration
+      //    (never raw `process.env`; an invalid value already failed at boot).
+      const registrationMode = getEnv().REGISTRATION_MODE as RegistrationMode;
 
       // 3. Validate access based on the selected mode (public, waiting_list, invite_code, paid_required)
       const accessPolicy = validateRegistrationAccess({
@@ -54,36 +58,29 @@ authRouter.post(
         hasPaid: body.hasPaid,
       });
 
-      // 4. Return registration result with normalized email and policy status
+      // 4. Return the registration result in the standard envelope.
       return c.json(
-        {
-          success: true,
-          data: {
-            email: normalizedEmail,
-            status: accessPolicy.status,
-            message:
-              accessPolicy.status === "waitlist"
-                ? "Registration received. You have been added to the waitlist."
-                : "Registration successful.",
-          },
-        },
+        ok({
+          email: normalizedEmail,
+          status: accessPolicy.status,
+          message:
+            accessPolicy.status === "waitlist"
+              ? "Registration received. You have been added to the waitlist."
+              : "Registration successful.",
+        }),
         201,
       );
     } catch (error: unknown) {
-      const err = error as {
-        statusCode?: number;
-        code?: string;
-        message?: string;
-      };
-      const statusCode = (err.statusCode || 400) as ContentfulStatusCode;
+      // Preserve the original status: a typed AppError keeps its code and
+      // status, and anything else maps to 500 via the single status helper, so
+      // a real server fault is never masked as a 400.
+      const statusCode = statusFromError(error) as ContentfulStatusCode;
+      const err = error as { code?: string; message?: string };
       return c.json(
-        {
-          success: false,
-          error: {
-            code: err.code || "REGISTRATION_FAILED",
-            message: err.message || "An unexpected error occurred",
-          },
-        },
+        fail(
+          err.code ?? "REGISTRATION_FAILED",
+          err.message ?? "An unexpected error occurred",
+        ),
         statusCode,
       );
     }

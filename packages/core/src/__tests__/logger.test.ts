@@ -138,11 +138,10 @@ describe("@opensaas/core - Logger", () => {
     expect(serialized).toContain("visible");
   });
 
-  // Known gap: pino `redact.paths` are case-sensitive, so capitalized field
-  // names (how HTTP headers usually arrive) slip past the logger's redaction.
-  // The pure `redact()` helper does not have this limitation; parity between
-  // the two mechanisms is tracked as debt for the audit work (§1.6).
-  test("capitalized field names are NOT redacted by the logger (known gap)", () => {
+  // The logger redacts through the shared, pure `redact()` helper (applied in
+  // pino's `formatters.log` hook), so redaction is case-insensitive and
+  // recursive — no more gap for capitalized HTTP headers.
+  test("capitalized field names are redacted (case-insensitive)", () => {
     const lines: string[] = [];
     const logger = createLogger(
       createEnv({ ...validEnv, NODE_ENV: "production" }),
@@ -152,7 +151,51 @@ describe("@opensaas/core - Logger", () => {
     logger.info({ Authorization: "Bearer secret", Password: "hunter2" });
 
     const serialized = lines.join("");
-    expect(serialized).toContain("Bearer secret");
-    expect(serialized).toContain("hunter2");
+    expect(serialized).not.toContain("Bearer secret");
+    expect(serialized).not.toContain("hunter2");
+    expect(serialized).toContain("[REDACTED]");
+  });
+
+  test("redaction covers HTTP header nesting and nested payloads", () => {
+    const lines: string[] = [];
+    const logger = createLogger(
+      createEnv({ ...validEnv, NODE_ENV: "production" }),
+      { write: (chunk: string) => lines.push(chunk) },
+    );
+
+    logger.info({
+      req: { headers: { authorization: "Bearer secret", accept: "*/*" } },
+      user: { name: "Ada", password: "hunter2" },
+    });
+
+    const serialized = lines.join("");
+    expect(serialized).not.toContain("Bearer secret");
+    expect(serialized).not.toContain("hunter2");
+    expect(serialized).toContain("*/*");
+    expect(serialized).toContain("Ada");
+  });
+
+  test("context bindings survive redaction alongside the payload", () => {
+    const lines: string[] = [];
+    // Real factory (with the redaction formatter) as the override, so both the
+    // request-context bindings and the redaction apply.
+    const logger = createLogger(
+      createEnv({ ...validEnv, NODE_ENV: "production" }),
+      { write: (chunk: string) => lines.push(chunk) },
+    );
+    setLogger(logger);
+
+    try {
+      withRequestContext({ requestId: "req-9" }, () => {
+        getLogger().info({ Authorization: "Bearer secret", keep: "ok" });
+      });
+
+      const entry = JSON.parse(lines[0] ?? "{}");
+      expect(entry.requestId).toBe("req-9");
+      expect(entry.Authorization).toBe("[REDACTED]");
+      expect(entry.keep).toBe("ok");
+    } finally {
+      resetLogger();
+    }
   });
 });

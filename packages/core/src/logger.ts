@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import pino, { type DestinationStream } from "pino";
 import { type Env, getEnv } from "./config";
-import { REDACT_PATHS } from "./redact";
+import { redact } from "./redact";
 
 /**
  * Per-request correlation context bound onto every log line emitted inside it.
@@ -31,8 +31,14 @@ export const getRequestContext = (): RequestContext | undefined =>
 /**
  * Build a logger from validated config. Pretty output in development, plain
  * JSON in production. Log level and environment come from the validated `env`
- * (never raw `process.env`), and sensitive fields are redacted everywhere.
- * Nothing is constructed at module load.
+ * (never raw `process.env`).
+ *
+ * Sensitive fields are redacted with the shared, pure {@link redact} helper
+ * applied in pino's `formatters.log` hook. Unlike pino's own `redact.paths`
+ * (case-sensitive and limited to enumerated depths), the helper is
+ * case-insensitive and recursive, so `Authorization`, `Set-Cookie`,
+ * `req.headers.authorization` and nested payloads are all covered by one
+ * mechanism — the same rules the audit diff reuses.
  *
  * `destination` is honored for tests that need to capture real serialized
  * output; production callers omit it and pino writes to stdout.
@@ -43,9 +49,12 @@ export const createLogger = (env: Env, destination?: DestinationStream) => {
   return pino(
     {
       level: env.LOG_LEVEL,
-      redact: {
-        paths: REDACT_PATHS,
-        censor: "[REDACTED]",
+      // Sanitize the merged log object (message + context bindings + payload)
+      // before serialization. Context bindings such as `requestId` are not
+      // sensitive, so they survive untouched.
+      formatters: {
+        log: (object: Record<string, unknown>) =>
+          redact(object) as Record<string, unknown>,
       },
       // Pretty transport cannot coexist with an injected destination.
       transport:

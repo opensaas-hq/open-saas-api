@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { REDACTED, REDACT_PATHS, SENSITIVE_KEYS, redact } from "../redact";
+import { REDACTED, SENSITIVE_KEYS, redact } from "../redact";
 
 describe("@opensaas/core - redact", () => {
   test("redacts sensitive keys case-insensitively at the top level", () => {
@@ -49,11 +49,29 @@ describe("@opensaas/core - redact", () => {
     expect(result.self).toBe(node);
   });
 
-  test("REDACT_PATHS enumerates sensitive keys across common nesting depths", () => {
+  test("redacts HTTP header casing nested inside req/res objects", () => {
+    const input = {
+      req: { headers: { Authorization: "Bearer x", accept: "*/*" } },
+      res: { headers: { "Set-Cookie": "session=abc" } },
+    };
+
+    const result = redact(input);
+
+    expect(result.req.headers.Authorization).toBe(REDACTED);
+    expect(result.res.headers["Set-Cookie"]).toBe(REDACTED);
+  });
+
+  test("uses a custom key set when provided", () => {
+    const input = { secretField: "a", keep: "b" };
+    const result = redact(input, ["secretField"]);
+
+    expect(result).toEqual({ secretField: REDACTED, keep: "b" });
+  });
+
+  test("every SENSITIVE_KEYS entry is redacted regardless of casing", () => {
     for (const key of SENSITIVE_KEYS) {
-      expect(REDACT_PATHS).toContain(key);
-      expect(REDACT_PATHS).toContain(`*.${key}`);
-      expect(REDACT_PATHS).toContain(`req.headers.${key}`);
+      const result = redact({ [key.toUpperCase()]: "value" });
+      expect(result[key.toUpperCase()]).toBe(REDACTED);
     }
   });
 });
