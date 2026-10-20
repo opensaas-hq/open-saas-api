@@ -73,13 +73,15 @@ describe("@opensaas/database - Contact repository", () => {
   test("bulk insert runs inside withTransaction", async () => {
     const orgId = await createOrg(suffix, "orgbulk");
 
-    const inserted = await withTransaction((tx) =>
-      createContactsBulk({
-        organizationId: orgId,
-        contacts: [{ name: "One" }, { name: "Two" }],
-        tx,
-      }),
-    );
+    const inserted = await withTransaction({
+      organizationId: orgId,
+      callback: (tx) =>
+        createContactsBulk({
+          organizationId: orgId,
+          contacts: [{ name: "One" }, { name: "Two" }],
+          tx,
+        }),
+    });
 
     expect(inserted).toHaveLength(2);
   });
@@ -96,16 +98,18 @@ describe("@opensaas/database - Contact repository", () => {
     // The second row reuses the first row's email within the same organization,
     // which the unique partial index rejects; the whole batch must roll back.
     await expect(
-      withTransaction((tx) =>
-        createContactsBulk({
-          organizationId: orgId,
-          contacts: [
-            { name: "Fresh", email: `fresh_${suffix}@x.co` },
-            { name: "Dupe", email: `dupe_${suffix}@x.co` },
-          ],
-          tx,
-        }),
-      ),
+      withTransaction({
+        organizationId: orgId,
+        callback: (tx) =>
+          createContactsBulk({
+            organizationId: orgId,
+            contacts: [
+              { name: "Fresh", email: `fresh_${suffix}@x.co` },
+              { name: "Dupe", email: `dupe_${suffix}@x.co` },
+            ],
+            tx,
+          }),
+      }),
     ).rejects.toThrow();
 
     const after = await getContactsByOrganization({ organizationId: orgId });

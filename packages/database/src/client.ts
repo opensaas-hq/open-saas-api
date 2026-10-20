@@ -1,4 +1,9 @@
-import { ServiceUnavailableError, getEnv } from "@opensaas/core";
+import {
+  ServiceUnavailableError,
+  TenantContextError,
+  getEnv,
+} from "@opensaas/core";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
@@ -239,12 +244,106 @@ export const resetDb = (): void => {
 
 /**
  * Run `callback` inside a single database transaction, rolling back on any
- * throw. Multi-statement repository flows must use this.
+ * throw. No tenant context is set — use this only for flows that are not
+ * tenant-scoped (migrations, health probes, framework tables).
  */
-export async function withTransaction<T>(
+export async function withRawTransaction<T>(
   callback: (tx: Transaction) => Promise<T>,
 ): Promise<T> {
   return await getDb().transaction(callback);
+}
+
+/** Options for {@link withTransaction}: the tenant scopes the transaction. */
+export type TenantTransactionOptions<T> = {
+  /** The tenant every statement in the transaction is scoped to. */
+  organizationId: string;
+  /** The work to perform inside the tenant-scoped transaction. */
+  callback: (tx: Transaction) => Promise<T>;
+};
+
+/**
+ * Reject a missing tenant before any query runs. A tenant-scoped operation
+ * without an organization is a programming error: it must fail loudly, never
+ * fall back to an unscoped (permissive) path.
+ */
+const requireOrganizationId = (organizationId: string | undefined): string => {
+  if (!organizationId || organizationId.trim() === "") {
+    throw new TenantContextError(
+      "A tenant-scoped operation requires a non-empty organizationId",
+      { field: "organizationId" },
+    );
+  }
+  return organizationId;
+};
+
+/**
+ * Set the transaction-local tenant GUC (`app.current_org`) read by the
+ * row-level-security policies (§2.5.1). `set_config(..., true)` is local to the
+ * transaction, so the value never leaks onto the pooled connection.
+ *
+ * When `RLS_ENABLED` is off, RLS is not enforced and the GUC is unnecessary;
+ * skipping it keeps the flag-off behavior identical to pre-RLS (no extra
+ * round-trip, no behavioral regression — §2.5.4 AC4).
+ */
+const setTenantGuc = async (
+  tx: Transaction,
+  organizationId: string,
+): Promise<void> => {
+  if (!getEnv().RLS_ENABLED) return;
+  await tx.execute(
+    sql`SELECT set_config('app.current_org', ${organizationId}, true)`,
+  );
+};
+
+/**
+ * Run `callback` inside a single database transaction scoped to one tenant:
+ * the first statement sets the `app.current_org` GUC so the RLS policies see
+ * the caller's tenant, then the callback runs. Rolls back on any throw.
+ *
+ * A missing `organizationId` throws {@link TenantContextError} before any SQL.
+ */
+export async function withTransaction<T>(
+  options: TenantTransactionOptions<T>,
+): Promise<T> {
+  const organizationId = requireOrganizationId(options.organizationId);
+  return await getDb().transaction(async (tx) => {
+    await setTenantGuc(tx, organizationId);
+    return await options.callback(tx);
+  });
+}
+
+/** Options for {@link runInTenantContext}. */
+export type TenantContextOptions<T> = {
+  /** The tenant the operation is scoped to. */
+  organizationId: string;
+  /** The work to run inside the tenant-scoped transaction. */
+  run: (tx: Transaction) => Promise<T>;
+  /**
+   * An existing transaction to reuse. When provided, the caller already set the
+   * GUC (e.g. via {@link withTransaction}) and no new transaction is opened.
+   */
+  tx?: Transaction;
+};
+
+/**
+ * Execute a single tenant-scoped operation with the tenant GUC set. Single
+ * reads and writes funnel through this so **every** repository call path
+ * carries the GUC, not only multi-statement flows. When `tx` is supplied the
+ * operation joins the caller's transaction instead of opening a new one.
+ *
+ * A missing `organizationId` throws {@link TenantContextError} before any SQL.
+ */
+export async function runInTenantContext<T>(
+  options: TenantContextOptions<T>,
+): Promise<T> {
+  const organizationId = requireOrganizationId(options.organizationId);
+  if (options.tx) {
+    return await options.run(options.tx);
+  }
+  return await getDb().transaction(async (tx) => {
+    await setTenantGuc(tx, organizationId);
+    return await options.run(tx);
+  });
 }
 
 /**

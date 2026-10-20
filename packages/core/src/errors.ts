@@ -72,6 +72,22 @@ export class ServiceUnavailableError extends AppError {
   }
 }
 
+/**
+ * 500 — a tenant-scoped operation was attempted without tenant context. This
+ * is a programming error, not a user error: the caller must supply an
+ * `organizationId` so the row-level-security GUC is set. It never resolves to
+ * an unscoped (permissive) query.
+ */
+export class TenantContextError extends AppError {
+  constructor(
+    message = "A tenant-scoped operation requires an organization context",
+    details?: Record<string, unknown>,
+  ) {
+    super(message, 500, "TENANT_CONTEXT_REQUIRED", details);
+    this.name = "TenantContextError";
+  }
+}
+
 // Response envelope types live in ./response; re-exported here for convenience
 // so existing `import { ApiResponse } from "@opensaas/core"` keeps working.
 export type {

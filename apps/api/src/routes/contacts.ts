@@ -88,16 +88,18 @@ contactsRouter.post("/bulk", async (c) => {
     throw fromZodError(parsed.error, "Invalid bulk contacts data");
   }
 
-  const insertedContacts = await withTransaction((tx) =>
-    createContactsBulk({
-      organizationId: tenant.organizationId,
-      contacts: parsed.data.contacts.map((item) => ({
-        ...item,
-        branchId: item.branchId || tenant.branchId,
-      })),
-      tx,
-    }),
-  );
+  const insertedContacts = await withTransaction({
+    organizationId: tenant.organizationId,
+    callback: (tx) =>
+      createContactsBulk({
+        organizationId: tenant.organizationId,
+        contacts: parsed.data.contacts.map((item) => ({
+          ...item,
+          branchId: item.branchId || tenant.branchId,
+        })),
+        tx,
+      }),
+  });
 
   return c.json(
     ok({
