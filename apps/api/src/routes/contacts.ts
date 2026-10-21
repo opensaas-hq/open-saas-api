@@ -2,8 +2,8 @@ import { zValidator } from "@hono/zod-validator";
 import { ok } from "@opensaas/core";
 import { Hono } from "hono";
 import {
-  bulkContactsRequestSchema,
   contactsQuerySchema,
+  createBulkContactsRequestSchema,
   createContactRequestSchema,
 } from "../dto/contacts";
 import { validationHook } from "../dto/validation";
@@ -12,87 +12,107 @@ import { tenantContextMiddleware } from "../middleware/tenant";
 import type { AppEnv } from "../types";
 
 /**
- * The contacts surface.
+ * Dependencies of the contacts routes.
+ */
+export type ContactsRouterOptions = {
+  /** Maximum number of contacts accepted in one bulk import (§4.5). */
+  bulkMaxContacts: number;
+};
+
+/**
+ * Build the contacts surface.
  *
  * The routes are pure HTTP adapters: they parse the request, call the
  * contacts service and serialize the envelope. Every rule — tenancy, branch
  * ownership, transactions and auditing — lives in the service (§4.4).
+ *
+ * The router is built per application because the bulk limit is a deployment
+ * knob (§4.5): the schema carries the configured maximum, so an oversized
+ * batch is refused before any transaction is started.
  */
-const contactsRouter = new Hono<AppEnv>();
+export const createContactsRouter = (
+  options: ContactsRouterOptions,
+): Hono<AppEnv> => {
+  const contactsRouter = new Hono<AppEnv>();
 
-contactsRouter.use("*", tenantContextMiddleware);
+  const bulkContactsRequestSchema = createBulkContactsRequestSchema(
+    options.bulkMaxContacts,
+  );
 
-// GET /api/contacts
-contactsRouter.get(
-  "/",
-  zValidator(
-    "query",
-    contactsQuerySchema,
-    validationHook("Invalid contact query parameters"),
-  ),
-  async (c) => {
-    const tenant = c.get("tenant");
-    const query = c.req.valid("query");
+  contactsRouter.use("*", tenantContextMiddleware);
 
-    const result = await c.get("services").contacts.list({
-      organizationId: tenant.organizationId,
-      ...query,
-    });
+  // GET /api/contacts
+  contactsRouter.get(
+    "/",
+    zValidator(
+      "query",
+      contactsQuerySchema,
+      validationHook("Invalid contact query parameters"),
+    ),
+    async (c) => {
+      const tenant = c.get("tenant");
+      const query = c.req.valid("query");
 
-    return c.json(ok(result.items, result.pagination));
-  },
-);
+      const result = await c.get("services").contacts.list({
+        organizationId: tenant.organizationId,
+        ...query,
+      });
 
-// POST /api/contacts
-contactsRouter.post(
-  "/",
-  zValidator(
-    "json",
-    createContactRequestSchema,
-    validationHook("Invalid contact data"),
-  ),
-  async (c) => {
-    const tenant = c.get("tenant");
-    const user = c.get("user");
-    const body = c.req.valid("json");
+      return c.json(ok(result.items, result.pagination));
+    },
+  );
 
-    const contact = await c.get("services").contacts.create({
-      organizationId: tenant.organizationId,
-      actorId: user.id,
-      branchId: tenant.branchId,
-      contact: body,
-    });
+  // POST /api/contacts
+  contactsRouter.post(
+    "/",
+    zValidator(
+      "json",
+      createContactRequestSchema,
+      validationHook("Invalid contact data"),
+    ),
+    async (c) => {
+      const tenant = c.get("tenant");
+      const user = c.get("user");
+      const body = c.req.valid("json");
 
-    return c.json(ok(contact), 201);
-  },
-);
+      const contact = await c.get("services").contacts.create({
+        organizationId: tenant.organizationId,
+        actorId: user.id,
+        branchId: tenant.branchId,
+        contact: body,
+      });
 
-// POST /api/contacts/bulk
-//
-// Bulk import is reserved to the roles that can change a whole tenant's
-// dataset at once (§4.3 permission matrix).
-contactsRouter.post(
-  "/bulk",
-  requirePermission("contacts:bulk"),
-  zValidator(
-    "json",
-    bulkContactsRequestSchema,
-    validationHook("Invalid bulk contacts data"),
-  ),
-  async (c) => {
-    const tenant = c.get("tenant");
-    const user = c.get("user");
-    const body = c.req.valid("json");
+      return c.json(ok(contact), 201);
+    },
+  );
 
-    const contacts = await c.get("services").contacts.bulkCreate({
-      organizationId: tenant.organizationId,
-      actorId: user.id,
-      branchId: tenant.branchId,
-      contacts: body.contacts,
-    });
+  // POST /api/contacts/bulk
+  //
+  // Bulk import is reserved to the roles that can change a whole tenant's
+  // dataset at once (§4.3 permission matrix).
+  contactsRouter.post(
+    "/bulk",
+    requirePermission("contacts:bulk"),
+    zValidator(
+      "json",
+      bulkContactsRequestSchema,
+      validationHook("Invalid bulk contacts data"),
+    ),
+    async (c) => {
+      const tenant = c.get("tenant");
+      const user = c.get("user");
+      const body = c.req.valid("json");
 
-    return c.json(ok({ count: contacts.length, contacts }), 201);
-  },
-);
+      const contacts = await c.get("services").contacts.bulkCreate({
+        organizationId: tenant.organizationId,
+        actorId: user.id,
+        branchId: tenant.branchId,
+        contacts: body.contacts,
+      });
 
-export { contactsRouter };
+      return c.json(ok({ count: contacts.length, contacts }), 201);
+    },
+  );
+
+  return contactsRouter;
+};

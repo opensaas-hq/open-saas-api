@@ -12,6 +12,22 @@ export const REGISTRATION_MODES = [
 ] as const;
 
 /**
+ * A boolean knob.
+ *
+ * The string form is what an `.env` file carries; the boolean form is what a
+ * programmatic source (a factory, a test) already has at hand. Both are
+ * accepted and the parsed value is always a real boolean.
+ *
+ * A plain `z.coerce.boolean()` would be wrong here: it would turn the string
+ * `"false"` into `true`.
+ */
+const booleanFlag = z
+  .union([z.boolean(), z.enum(["true", "false"])])
+  .transform((value) =>
+    typeof value === "boolean" ? value : value === "true",
+  );
+
+/**
  * Validated configuration contract. Every new variable must be declared here
  * and documented in `.env.example`.
  */
@@ -64,10 +80,7 @@ export const envSchema = z.object({
   DB_RETRY_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   DB_RETRY_BASE_DELAY_MS: z.coerce.number().int().nonnegative().default(100),
   DB_RETRY_MAX_DELAY_MS: z.coerce.number().int().positive().default(5_000),
-  DB_BREAKER_ENABLED: z
-    .enum(["true", "false"])
-    .default("true")
-    .transform((value) => value === "true"),
+  DB_BREAKER_ENABLED: booleanFlag.default(true),
   DB_BREAKER_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(5),
   DB_BREAKER_COOLDOWN_MS: z.coerce.number().int().positive().default(10_000),
   DB_BREAKER_PROBE_TIMEOUT_MS: z.coerce
@@ -80,10 +93,7 @@ export const envSchema = z.object({
   // `opensaas_app` role and every tenant-scoped transaction sets the
   // `app.current_org` GUC. Off in local development until the application-layer
   // adoption lands; on in the RLS test job. See docs/architecture/multitenancy.md.
-  RLS_ENABLED: z
-    .enum(["true", "false"])
-    .default("false")
-    .transform((value) => value === "true"),
+  RLS_ENABLED: booleanFlag.default(false),
   DISPOSABLE_EMAIL_DOMAINS: z.string().optional(),
   // Comma-separated allowlist of browser origins accepted by Better Auth's
   // CSRF/origin check (§3.4). The same list feeds the API CORS config (§4.5).
@@ -91,10 +101,7 @@ export const envSchema = z.object({
   TRUSTED_ORIGINS: z.string().optional(),
   // Better Auth built-in rate limiter (§3.4). Enabled by default; the window and
   // max are per auth route-class.
-  AUTH_RATE_LIMIT_ENABLED: z
-    .enum(["true", "false"])
-    .default("true")
-    .transform((value) => value === "true"),
+  AUTH_RATE_LIMIT_ENABLED: booleanFlag.default(true),
   AUTH_RATE_LIMIT_WINDOW_S: z.coerce.number().int().positive().default(60),
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
   // Session lifetime policy (§3.4). `expiresIn` is the absolute lifetime;
@@ -114,6 +121,19 @@ export const envSchema = z.object({
   // a burst of requests does not turn into a burst of `member` lookups. The
   // TTL bounds how long a role change can stay invisible.
   MEMBERSHIP_CACHE_TTL_S: z.coerce.number().int().nonnegative().default(30),
+  // Maximum size, in bytes, of a request body (§4.5). The limit is global:
+  // a single oversized body is refused with a 413 before it reaches a route.
+  BODY_SIZE_LIMIT_BYTES: z.coerce.number().int().positive().default(1_048_576),
+  // Maximum number of contacts accepted in one bulk import (§4.5). The limit
+  // is enforced by the DTO schema, so an oversized batch is a validation
+  // failure and never reaches the transaction.
+  BULK_MAX_CONTACTS: z.coerce.number().int().positive().default(1_000),
+  // Write-endpoint rate limiter (§4.5). Better Auth guards its own routes
+  // (§3.4); this one guards the project's write endpoints (registration and
+  // the CRM writes). `false` disables the limiter.
+  WRITE_RATE_LIMIT_ENABLED: booleanFlag.default(true),
+  WRITE_RATE_LIMIT_WINDOW_S: z.coerce.number().int().positive().default(60),
+  WRITE_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(30),
   // An empty string (e.g. an unset `.env` entry) falls back to the default
   // instead of being treated as an invalid value.
   REGISTRATION_MODE: z.preprocess(

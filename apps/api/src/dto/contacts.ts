@@ -36,12 +36,24 @@ export const createContactRequestSchema = z.object({
   metadata: metadataSchema.prefault(EMPTY_METADATA),
 });
 
-/** Request schema of the bulk import. */
-export const bulkContactsRequestSchema = z.object({
-  contacts: z
-    .array(createContactRequestSchema)
-    .min(1, "At least one contact is required"),
-});
+/**
+ * Build the request schema of the bulk import.
+ *
+ * The maximum number of contacts is a deployment knob (§4.5), so the schema
+ * is built with it: a batch above the limit is rejected as a validation
+ * failure before the transaction starts, and a single request can never
+ * insert an unbounded number of rows.
+ */
+export const createBulkContactsRequestSchema = (maxContacts: number) =>
+  z.object({
+    contacts: z
+      .array(createContactRequestSchema)
+      .min(1, "At least one contact is required")
+      .max(
+        maxContacts,
+        `At most ${maxContacts} contacts can be imported at once`,
+      ),
+  });
 
 /** Query schema for listing contacts. */
 export const contactsQuerySchema = z.object({

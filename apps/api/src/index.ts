@@ -1,5 +1,5 @@
 import { createAuth } from "@opensaas/auth";
-import { getEnv, getLogger, initConfig } from "@opensaas/core";
+import { createLogger, getEnv, initConfig } from "@opensaas/core";
 import { db } from "@opensaas/database";
 import { createApp } from "./app";
 
@@ -8,8 +8,10 @@ import { createApp } from "./app";
 initConfig();
 
 // Derive local env/logger from the factories instead of importing singletons.
+// The logger is built here and injected into the app: no request-scoped code
+// reaches for a process-wide logger anymore (§4.5, TD-11).
 const env = getEnv();
-const logger = getLogger();
+const logger = createLogger(env);
 
 // The auth instance is built here and injected into the app (§4.7): nothing
 // reads the environment at import time anymore.

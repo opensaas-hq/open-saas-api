@@ -1,5 +1,10 @@
 import { createAuth } from "@opensaas/auth";
-import { type Env, createEnv, createLogger } from "@opensaas/core";
+import {
+  type DestinationStream,
+  type Env,
+  createEnv,
+  createLogger,
+} from "@opensaas/core";
 import { db } from "@opensaas/database";
 import type { Hono } from "hono";
 import { createApp } from "../../app";
@@ -28,6 +33,10 @@ const baseEnvSource: Record<string, unknown> = {
   BETTER_AUTH_URL: APP_ORIGIN,
   REGISTRATION_MODE: "public",
   AUTH_RATE_LIMIT_ENABLED: "false",
+  // The write limiter is off by default in the suites: they create tenants
+  // and contacts in a loop and would exhaust a shared budget. The suite that
+  // covers the limiter enables it explicitly.
+  WRITE_RATE_LIMIT_ENABLED: "false",
 };
 
 /**
@@ -45,17 +54,51 @@ export type TestApp = {
 };
 
 /**
+ * Options of {@link createTestApp}.
+ */
+export type TestAppOptions = {
+  /**
+   * Destination of the logger, so a test can capture the serialized log lines
+   * (the access log, §4.5) instead of writing them to stdout.
+   */
+  destination?: DestinationStream;
+};
+
+/**
  * Build an app bound to a specific configuration (§4.7).
  *
  * Every dependency is injected, so a test can pick a registration mode, a rate
  * limit or any other knob without touching the process environment.
  */
-export const createTestApp = (overrides: Partial<Env> = {}): TestApp => {
+export const createTestApp = (
+  overrides: Partial<Env> = {},
+  options: TestAppOptions = {},
+): TestApp => {
   const env = createEnv({ ...baseEnvSource, ...overrides });
-  const logger = createLogger(env);
+  const logger = createLogger(env, options.destination);
   const auth = createAuth(env, db);
 
   return { app: createApp({ env, db, auth, logger }), env };
+};
+
+/**
+ * A logger destination that keeps every serialized line in memory, so a test
+ * can assert on the emitted logs.
+ */
+export const createLogCapture = (): {
+  lines: string[];
+  destination: DestinationStream;
+} => {
+  const lines: string[] = [];
+
+  return {
+    lines,
+    destination: {
+      write: (line: string) => {
+        lines.push(line);
+      },
+    },
+  };
 };
 
 /**

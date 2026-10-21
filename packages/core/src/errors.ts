@@ -77,6 +77,41 @@ export class ConflictError extends AppError {
 }
 
 /**
+ * 429 — the client exceeded the rate limit of the endpoint. The error carries
+ * the number of seconds the client should wait, so the HTTP layer can answer
+ * with the `Retry-After` header (§4.5).
+ */
+export class TooManyRequestsError extends AppError {
+  /** Seconds the client should wait before retrying. */
+  public readonly retryAfterSeconds: number;
+
+  constructor(
+    message = "Too many requests",
+    details?: Record<string, unknown>,
+    retryAfterSeconds = 60,
+  ) {
+    super(message, 429, "TOO_MANY_REQUESTS", details);
+    this.name = "TooManyRequestsError";
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+/**
+ * 413 — the request body is larger than the configured limit (§4.5). The
+ * limit is checked before the body is parsed, so an oversized payload is
+ * refused without being read into memory.
+ */
+export class PayloadTooLargeError extends AppError {
+  constructor(
+    message = "Payload too large",
+    details?: Record<string, unknown>,
+  ) {
+    super(message, 413, "PAYLOAD_TOO_LARGE", details);
+    this.name = "PayloadTooLargeError";
+  }
+}
+
+/**
  * 503 — the service is temporarily unable to handle the request, e.g. a
  * dependency is down or a circuit breaker is open. Callers may retry later.
  */

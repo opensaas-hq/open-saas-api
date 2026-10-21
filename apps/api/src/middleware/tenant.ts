@@ -1,4 +1,9 @@
-import { AppError, UnauthorizedError, ValidationError } from "@opensaas/core";
+import {
+  AppError,
+  UnauthorizedError,
+  ValidationError,
+  getRequestContext,
+} from "@opensaas/core";
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../types";
@@ -98,6 +103,15 @@ export const tenantContextMiddleware: MiddlewareHandler<AppEnv> = async (
     branchId,
     role,
   });
+
+  // 7. Enrich the request context (§1.4) with the tenant and the user, so
+  // the access log (§4.5) can report them without resolving the session
+  // twice.
+  const requestContext = getRequestContext();
+  if (requestContext) {
+    requestContext.tenantId = activeOrgId;
+    requestContext.userId = user.id;
+  }
 
   await next();
 };

@@ -4,6 +4,13 @@ import { type Env, getEnv } from "./config";
 import { redact } from "./redact";
 
 /**
+ * The writable stream a logger writes to. Re-exported so a consumer (e.g. a
+ * test capturing the access log, §4.5) can build a destination without
+ * depending on pino directly.
+ */
+export type { DestinationStream };
+
+/**
  * Per-request correlation context bound onto every log line emitted inside it.
  * The `request-id` middleware wires this in the API pipeline; everything in
  * between can read it via {@link getRequestContext}.

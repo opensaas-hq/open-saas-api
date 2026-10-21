@@ -4,6 +4,7 @@ import {
   type Env,
   type Logger,
   NotFoundError,
+  TooManyRequestsError,
   fail,
   ok,
   statusFromError,
@@ -15,7 +16,8 @@ import {
 } from "@opensaas/database";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { contactsRouter } from "./routes/contacts";
+import { createPipeline } from "./middleware/pipeline";
+import { createContactsRouter } from "./routes/contacts";
 import { registrationRouter } from "./routes/registration";
 import { createBranchesService } from "./services/branches.service";
 import { createContactsService } from "./services/contacts.service";
@@ -85,6 +87,14 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnv> => {
     await next();
   });
 
+  // The cross-cutting pipeline (§4.5) is mounted before every route, the
+  // Better Auth surface included: the correlation id, the access log, the
+  // security headers, the CORS allowlist, the write rate limit and the body
+  // size limit apply to every request the app answers.
+  for (const middleware of createPipeline({ env, logger })) {
+    app.use("*", middleware);
+  }
+
   // Better Auth owns every `/api/auth/*` endpoint (§4.1): sign-up, sign-in,
   // sign-out, session, and the organization plugin endpoints.
   app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
@@ -115,7 +125,10 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnv> => {
   });
 
   app.route("/api/registration", registrationRouter);
-  app.route("/api/contacts", contactsRouter);
+  app.route(
+    "/api/contacts",
+    createContactsRouter({ bulkMaxContacts: env.BULK_MAX_CONTACTS }),
+  );
 
   // Unknown routes still answer with the JSON envelope instead of Hono's
   // plain-text default, keeping the response contract intact.
@@ -126,6 +139,11 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnv> => {
 
   app.onError((err, c) => {
     if (err instanceof AppError) {
+      // A rate-limited client is told how long it has to wait (§4.5).
+      if (err instanceof TooManyRequestsError) {
+        c.header("retry-after", String(err.retryAfterSeconds));
+      }
+
       logger.warn({
         code: err.code,
         message: err.message,
