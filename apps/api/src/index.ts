@@ -8,7 +8,7 @@ import {
   ok,
   statusFromError,
 } from "@opensaas/core";
-import { checkDatabaseHealth } from "@opensaas/database";
+import { checkDatabaseHealth, db } from "@opensaas/database";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { authRouter } from "./routes/auth";
@@ -25,9 +25,23 @@ const logger = getLogger();
 
 const app = new Hono<AppEnv>();
 
+// Dependency-injection slots (§4.7): expose the validated config and the
+// database handle on the request context so downstream middleware/handlers read
+// them from `c.get(...)` instead of reaching for module globals. Registered
+// before any route so every request sees them.
+app.use("*", async (c, next) => {
+  c.set("env", env);
+  c.set("db", db);
+  await next();
+});
+
 // Health check route (Liveness & Readiness)
 app.get("/api/health", async (c) => {
-  const isDbConnected = await checkDatabaseHealth();
+  // Read the DI slots rather than the module-level bindings, proving they are
+  // consumed (no dead scaffolding, §4.7 AC4).
+  const requestEnv = c.get("env");
+  const database = c.get("db");
+  const isDbConnected = await checkDatabaseHealth({ db: database });
 
   if (!isDbConnected) {
     logger.error("❌ Database health check failed: disconnected");
@@ -38,7 +52,7 @@ app.get("/api/health", async (c) => {
   return c.json(
     ok({
       status: isDbConnected ? "ok" : "degraded",
-      environment: env.NODE_ENV,
+      environment: requestEnv.NODE_ENV,
       database: isDbConnected ? "connected" : "disconnected",
       timestamp: new Date().toISOString(),
     }),
