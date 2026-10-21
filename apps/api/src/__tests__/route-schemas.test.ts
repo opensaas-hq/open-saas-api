@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { registerSchema } from "../routes/auth";
 import { contactsQuerySchema, createContactSchema } from "../routes/contacts";
+import { registerSchema } from "../routes/registration";
 
 // These exercise the real Zod v4 schemas used by the routes, so a regression in
 // validation (or a Zod upgrade) is caught without needing a database.

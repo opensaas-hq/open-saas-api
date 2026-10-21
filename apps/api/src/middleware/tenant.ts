@@ -1,10 +1,27 @@
-import { auth } from "@opensaas/auth";
 import { AppError, UnauthorizedError } from "@opensaas/core";
-import type { Context, Next } from "hono";
+import type { MiddlewareHandler } from "hono";
+import type { AppEnv } from "../types";
 
-export async function tenantContextMiddleware(c: Context, next: Next) {
-  // 1. Validate session from cookies, Bearer tokens, or API keys
-  const sessionData = await auth.api.getSession({
+/**
+ * Resolve the tenant context from the request session.
+ *
+ * This is the single session → tenant resolver of the app (§4.3): it reads
+ * the session through the injected auth instance, refuses a request without a
+ * valid session, and requires an active organization before touching any
+ * tenant-scoped resource.
+ *
+ * The membership and branch-ownership checks live here too (§4.3): the user
+ * must be a `member` of the active organization, and a requested branch must
+ * belong to it.
+ */
+export const tenantContextMiddleware: MiddlewareHandler<AppEnv> = async (
+  c,
+  next,
+) => {
+  // 1. Validate session from cookies, Bearer tokens, or API keys. The auth
+  // instance comes from the DI slot, so the session is verified with the same
+  // configuration (and database handle) the rest of the request uses.
+  const sessionData = await c.get("auth").api.getSession({
     headers: c.req.raw.headers,
   });
 
@@ -40,4 +57,4 @@ export async function tenantContextMiddleware(c: Context, next: Next) {
   });
 
   await next();
-}
+};

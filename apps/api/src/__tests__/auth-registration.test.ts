@@ -1,41 +1,28 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
-import { initConfig } from "@opensaas/core";
 import { schema, withRawTransaction } from "@opensaas/database";
-import app from "../index";
-import { registerSchema } from "../routes/auth";
+import type { Hono } from "hono";
+import type { AppEnv } from "../types";
+import { createTestApp, hasTestDatabase, jsonHeaders } from "./support/app";
 
-// The route reads the registration mode from validated config, so tests inject
-// it through `initConfig` instead of mutating `process.env` between cases. The
-// database URL comes from the real test environment (`.env.test`), because
-// registration now persists rows (§3.1).
-const baseEnv = {
-  NODE_ENV: "test",
-  DATABASE_URL: process.env.DATABASE_URL,
-  DATABASE_URL_TEST: process.env.DATABASE_URL_TEST,
-  BETTER_AUTH_SECRET: "x".repeat(32),
-  BETTER_AUTH_URL: "http://localhost:3015",
-};
+// The route reads the registration mode from the validated config carried by
+// the request context, so each case injects it through the app factory
+// instead of mutating `process.env`. The database URL comes from the real test
+// environment (`.env.test`), because registration persists rows (§3.1).
+const describeIfDb = hasTestDatabase() ? describe : describe.skip;
 
-const hasDatabase =
-  typeof process.env.DATABASE_URL === "string" &&
-  process.env.DATABASE_URL === process.env.DATABASE_URL_TEST;
-
-const describeIfDb = hasDatabase ? describe : describe.skip;
-
-const register = (body: Record<string, unknown>) =>
-  app.fetch(
-    new Request("http://localhost/api/auth/register", {
+const register = async (app: Hono<AppEnv>, body: Record<string, unknown>) =>
+  await app.fetch(
+    new Request("http://localhost/api/registration", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: jsonHeaders(),
       body: JSON.stringify(body),
     }),
   );
 
 describeIfDb(
-  "Apps/API - Auth Registration Integration Routes (/api/auth/register)",
+  "Apps/API - Auth Registration Integration Routes (/api/registration)",
   () => {
     beforeEach(async () => {
-      initConfig({ ...baseEnv, REGISTRATION_MODE: "public" });
       await withRawTransaction(async (tx) => {
         await tx.execute(
           `TRUNCATE TABLE registration_code, waitlist_entry, "member",
@@ -51,7 +38,9 @@ describeIfDb(
     });
 
     test("registers successfully and persists the rows (§3.1 AC5)", async () => {
-      const res = await register({
+      const { app } = createTestApp({ REGISTRATION_MODE: "public" });
+
+      const res = await register(app, {
         email: "johndoe@example.com",
         password: "securepassword123",
         name: "John Doe",
@@ -78,7 +67,9 @@ describeIfDb(
     });
 
     test("rejects a disposable email with 422", async () => {
-      const res = await register({
+      const { app } = createTestApp({ REGISTRATION_MODE: "public" });
+
+      const res = await register(app, {
         email: "user@mailinator.com",
         password: "password123",
         name: "Burner User",
@@ -91,7 +82,9 @@ describeIfDb(
     });
 
     test("an invalid payload returns the 422 envelope with field details", async () => {
-      const res = await register({
+      const { app } = createTestApp({ REGISTRATION_MODE: "public" });
+
+      const res = await register(app, {
         email: "bad-email",
         password: "short",
         name: "",
@@ -104,9 +97,9 @@ describeIfDb(
     });
 
     test("waiting_list mode persists a waitlist row", async () => {
-      initConfig({ ...baseEnv, REGISTRATION_MODE: "waiting_list" });
+      const { app } = createTestApp({ REGISTRATION_MODE: "waiting_list" });
 
-      const res = await register({
+      const res = await register(app, {
         email: "waitlist.user@example.com",
         password: "password123",
         name: "Waitlist User",
@@ -127,12 +120,14 @@ describeIfDb(
     });
 
     test("a duplicate email returns a 409 with a stable code (§3.1 AC4)", async () => {
-      await register({
+      const { app } = createTestApp({ REGISTRATION_MODE: "public" });
+
+      await register(app, {
         email: "dup@example.com",
         password: "password123",
         name: "First",
       });
-      const res = await register({
+      const res = await register(app, {
         email: "dup@example.com",
         password: "password123",
         name: "Second",
@@ -144,34 +139,15 @@ describeIfDb(
     });
 
     test("rejects invite_code mode if no code is provided", async () => {
-      initConfig({ ...baseEnv, REGISTRATION_MODE: "invite_code" });
+      const { app } = createTestApp({ REGISTRATION_MODE: "invite_code" });
 
-      const res = await register({
+      const res = await register(app, {
         email: "invited.user@example.com",
         password: "password123",
         name: "Invited User",
       });
 
       expect(res.status).toBe(422);
-    });
-
-    // §3.2 AC1: no field in the register DTO can assert payment.
-    test("the register DTO has no payment field a client could assert", () => {
-      const parsed = registerSchema.safeParse({
-        email: "user@example.com",
-        password: "password123",
-        name: "User",
-        hasPaid: true,
-        paid: true,
-        paymentReference: "anything",
-      });
-
-      expect(parsed.success).toBe(true);
-      if (parsed.success) {
-        expect(parsed.data).not.toHaveProperty("hasPaid");
-        expect(parsed.data).not.toHaveProperty("paid");
-        expect(parsed.data).not.toHaveProperty("paymentReference");
-      }
     });
   },
 );

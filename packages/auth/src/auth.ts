@@ -1,5 +1,5 @@
 import type { Env } from "@opensaas/core";
-import { getEnv, getTrustedOrigins } from "@opensaas/core";
+import { getTrustedOrigins } from "@opensaas/core";
 import { type Database, db, schema } from "@opensaas/database";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -163,8 +163,10 @@ export const createAuth = (
 };
 
 /**
- * Process-wide auth instance built from the validated config. Kept for the
- * request-time surface (sessions, handler mounting); flows that need
- * transaction control build their own instance via {@link createAuth}.
+ * The Better Auth instance type produced by {@link createAuth}.
+ *
+ * Consumers (the HTTP surface) depend on this type instead of a hand-written
+ * copy of the session/user shapes, so a change in the auth configuration
+ * surfaces at compile time at the usage site (§4.7).
  */
-export const auth = createAuth(getEnv());
+export type AuthInstance = ReturnType<typeof createAuth>;

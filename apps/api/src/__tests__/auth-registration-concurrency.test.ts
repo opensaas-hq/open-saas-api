@@ -1,38 +1,26 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
-import { initConfig } from "@opensaas/core";
 import {
   createRegistrationCode,
   getRegistrationCode,
   schema,
   withRawTransaction,
 } from "@opensaas/database";
-import app from "../index";
+import type { Hono } from "hono";
+import type { AppEnv } from "../types";
+import { createTestApp, hasTestDatabase, jsonHeaders } from "./support/app";
 
 // Two concurrent registrations compete for a single-use invite code: exactly
 // one must win (201) and the other must be refused with a typed 409/422 — never
 // a 500, and never two consumed uses. This exercises the server-side guarantee
 // end-to-end through the route (§3.2 AC2, §4.4), beyond the repository-level
 // race covered in packages/database.
-const baseEnv = {
-  NODE_ENV: "test",
-  DATABASE_URL: process.env.DATABASE_URL,
-  DATABASE_URL_TEST: process.env.DATABASE_URL_TEST,
-  BETTER_AUTH_SECRET: "x".repeat(32),
-  BETTER_AUTH_URL: "http://localhost:3015",
-  REGISTRATION_MODE: "invite_code",
-};
+const describeIfDb = hasTestDatabase() ? describe : describe.skip;
 
-const hasDatabase =
-  typeof process.env.DATABASE_URL === "string" &&
-  process.env.DATABASE_URL === process.env.DATABASE_URL_TEST;
-
-const describeIfDb = hasDatabase ? describe : describe.skip;
-
-const register = (body: Record<string, unknown>) =>
-  app.fetch(
-    new Request("http://localhost/api/auth/register", {
+const register = async (app: Hono<AppEnv>, body: Record<string, unknown>) =>
+  await app.fetch(
+    new Request("http://localhost/api/registration", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: jsonHeaders(),
       body: JSON.stringify(body),
     }),
   );
@@ -41,7 +29,6 @@ describeIfDb(
   "Apps/API - Registration concurrency on a single-use invite code (§3.2)",
   () => {
     beforeEach(async () => {
-      initConfig(baseEnv);
       await withRawTransaction(async (tx) => {
         await tx.execute(
           `TRUNCATE TABLE registration_code, waitlist_entry, "member",
@@ -57,16 +44,17 @@ describeIfDb(
     });
 
     test("exactly one of two parallel registrations consumes the last use", async () => {
+      const { app } = createTestApp({ REGISTRATION_MODE: "invite_code" });
       await createRegistrationCode({ code: "RACE-CODE", maxUses: 1 });
 
       const [first, second] = await Promise.all([
-        register({
+        register(app, {
           email: "racer.one@example.com",
           password: "password123",
           name: "Racer One",
           inviteCode: "RACE-CODE",
         }),
-        register({
+        register(app, {
           email: "racer.two@example.com",
           password: "password123",
           name: "Racer Two",

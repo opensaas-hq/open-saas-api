@@ -30,8 +30,12 @@ export const getRequestContext = (): RequestContext | undefined =>
 
 /**
  * Build a logger from validated config. Pretty output in development, plain
- * JSON in production. Log level and environment come from the validated `env`
- * (never raw `process.env`).
+ * JSON in production and in tests. Log level and environment come from the
+ * validated `env` (never raw `process.env`).
+ *
+ * The pretty transport is only enabled for `NODE_ENV="development"`: it is a
+ * developer convenience, it is not installed in every workspace, and a test
+ * run must never depend on a transport worker thread (§4.7).
  *
  * Sensitive fields are redacted with the shared, pure {@link redact} helper
  * applied in pino's `formatters.log` hook. Unlike pino's own `redact.paths`
@@ -44,7 +48,7 @@ export const getRequestContext = (): RequestContext | undefined =>
  * output; production callers omit it and pino writes to stdout.
  */
 export const createLogger = (env: Env, destination?: DestinationStream) => {
-  const isDevelopment = env.NODE_ENV !== "production";
+  const isDevelopment = env.NODE_ENV === "development";
 
   return pino(
     {
@@ -117,7 +121,7 @@ const resolveBaseLogger = (): Logger => {
 export const getLogger = (): Logger => bindRequestContext(resolveBaseLogger());
 
 /**
- * Test seam: force the logger returned by {@link getLogger} / {@link getBaseLogger}.
+ * Test seam: force the logger returned by {@link getLogger}.
  * Paired with {@link resetLogger}; avoids touching `process.env` to capture logs.
  */
 export const setLogger = (logger: Logger): void => {
@@ -129,9 +133,3 @@ export const resetLogger = (): void => {
   overrideLogger = undefined;
   cachedLogger = undefined;
 };
-
-/**
- * Logger usable outside request scope (boot, background jobs). Kept separate
- * from {@link getLogger} so callers are explicit when there is no context.
- */
-export const getBaseLogger = (): Logger => resolveBaseLogger();

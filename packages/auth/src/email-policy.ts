@@ -73,8 +73,19 @@ export function isDisposableEmail(
   return disposableDomains.has(domain);
 }
 
-export function validateAndNormalizeEmail(email: string): string {
-  if (isDisposableEmail(email)) {
+/**
+ * Validate an email against the disposable-domain blocklist and return its
+ * normalized form.
+ *
+ * The blocklist is injectable so a caller that owns a validated configuration
+ * can pass exactly that list, instead of relying on the process-wide env
+ * (§4.7). The default keeps the standalone behavior for direct callers.
+ */
+export function validateAndNormalizeEmail(
+  email: string,
+  disposableDomains: Set<string> = getDisposableDomains(),
+): string {
+  if (isDisposableEmail(email, disposableDomains)) {
     throw new ValidationError(
       "Disposable/temporary email addresses are not allowed. Please use a permanent email address.",
       { field: "email", code: "DISPOSABLE_EMAIL_REJECTED" },

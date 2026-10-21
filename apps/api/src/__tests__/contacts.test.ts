@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import app from "../index";
+import { createTestApp } from "./support/app";
 
 describe("Apps/API - Contacts Routes (/api/contacts)", () => {
   test("GET /api/contacts - should require authentication/tenant context", async () => {
+    const { app } = createTestApp();
+
     const req = new Request("http://localhost/api/contacts");
     const res = await app.fetch(req);
 
@@ -14,6 +16,8 @@ describe("Apps/API - Contacts Routes (/api/contacts)", () => {
   });
 
   test("GET /api/contacts with a bad query still requires auth first (401)", async () => {
+    const { app } = createTestApp();
+
     // The tenant middleware runs before validation, so an unauthenticated
     // caller gets the 401 envelope regardless of query shape.
     const res = await app.fetch(
@@ -27,6 +31,8 @@ describe("Apps/API - Contacts Routes (/api/contacts)", () => {
   });
 
   test("POST /api/contacts - should reject invalid payloads (validation error)", async () => {
+    const { app } = createTestApp();
+
     const req = new Request("http://localhost/api/contacts", {
       method: "POST",
       headers: {

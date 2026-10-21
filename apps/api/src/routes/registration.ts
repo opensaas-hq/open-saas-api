@@ -4,16 +4,11 @@ import {
   createStrategyRegistry,
   registerUser,
 } from "@opensaas/auth";
-import {
-  fail,
-  fromZodError,
-  getEnv,
-  ok,
-  statusFromError,
-} from "@opensaas/core";
+import { fail, fromZodError, ok, statusFromError } from "@opensaas/core";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
+import type { AppEnv } from "../types";
 
 /**
  * Request schema for registration. Exported for direct unit testing.
@@ -38,10 +33,17 @@ const registrationRegistry = createStrategyRegistry({
   inviteCodes: createDatabaseInviteCodeValidator(),
 });
 
-export const authRouter = new Hono();
+/**
+ * Project-owned registration surface.
+ *
+ * It lives **outside** `/api/auth/*` on purpose: Better Auth owns that whole
+ * prefix (§4.1), so a custom route below it would be shadowed by the
+ * framework handler. The path is `/api/registration` (§4.1, path decision).
+ */
+export const registrationRouter = new Hono<AppEnv>();
 
-authRouter.post(
-  "/register",
+registrationRouter.post(
+  "/",
   zValidator("json", registerSchema, (result, c) => {
     if (!result.success) {
       const error = fromZodError(result.error, "Invalid registration payload");
@@ -66,7 +68,9 @@ authRouter.post(
           name: body.name,
           inviteCode: body.inviteCode,
         },
-        { env: getEnv(), registry: registrationRegistry },
+        // The registration mode comes from the validated config carried by the
+        // request context, never from raw `process.env` (§4.2).
+        { env: c.get("env"), registry: registrationRegistry },
       );
 
       return c.json(

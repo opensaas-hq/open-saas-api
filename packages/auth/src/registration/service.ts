@@ -1,7 +1,10 @@
 import { ConflictError, type Env, ValidationError } from "@opensaas/core";
 import { createWaitlistEntry, withRawTransaction } from "@opensaas/database";
 import { createAuth } from "../auth";
-import { validateAndNormalizeEmail } from "../email-policy";
+import {
+  getDisposableDomains,
+  validateAndNormalizeEmail,
+} from "../email-policy";
 import type { EmailSender } from "../ports/email";
 import type { StrategyRegistry } from "./registry";
 import type { RegistrationStatus } from "./types";
@@ -84,7 +87,12 @@ export async function registerUser(
 ): Promise<RegisterUserResult> {
   const { env, registry, emailSender } = dependencies;
 
-  const email = validateAndNormalizeEmail(input.email);
+  const email = validateAndNormalizeEmail(
+    input.email,
+    // The blocklist comes from the injected configuration, not from the
+    // process-wide env, so the flow honours the config it was given (§4.7).
+    getDisposableDomains(env.DISPOSABLE_EMAIL_DOMAINS),
+  );
   const mode = env.REGISTRATION_MODE;
   const strategy = registry.require(mode);
 
