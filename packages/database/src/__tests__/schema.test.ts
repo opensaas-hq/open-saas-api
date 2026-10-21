@@ -9,7 +9,7 @@ import {
   session,
   user,
   verification,
-} from "./schema";
+} from "../schema";
 
 describe("@opensaas/database - Schema & Client", () => {
   describe("Better Auth Core Tables", () => {

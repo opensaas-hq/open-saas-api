@@ -14,7 +14,7 @@ import {
   isTransientDbError,
   realSleeper,
   withRetry,
-} from "./resilience";
+} from "./client/resilience";
 import * as schema from "./schema";
 
 /** Pool and timeout settings for the underlying `postgres` client. */

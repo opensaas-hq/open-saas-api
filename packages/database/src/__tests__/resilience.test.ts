@@ -5,7 +5,7 @@ import {
   type Sleeper,
   isTransientDbError,
   withRetry,
-} from "../resilience";
+} from "../client/resilience";
 
 /** Records every delay instead of waiting, so tests run in real time 0. */
 const recordingSleeper = (delays: number[]): Sleeper => {
