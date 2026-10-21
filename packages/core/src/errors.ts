@@ -59,6 +59,24 @@ export class ForbiddenError extends AppError {
 }
 
 /**
+ * 409 — the request conflicts with the current state of the resource, e.g.
+ * registering an email that already exists. A distinct status from 422 lets
+ * clients tell "invalid input" apart from "you cannot do that yet". The `code`
+ * defaults to the generic `CONFLICT` but can be narrowed to a stable,
+ * domain-specific value (e.g. `EMAIL_ALREADY_REGISTERED`).
+ */
+export class ConflictError extends AppError {
+  constructor(
+    message = "Conflict",
+    details?: Record<string, unknown>,
+    code = "CONFLICT",
+  ) {
+    super(message, 409, code, details);
+    this.name = "ConflictError";
+  }
+}
+
+/**
  * 503 — the service is temporarily unable to handle the request, e.g. a
  * dependency is down or a circuit breaker is open. Callers may retry later.
  */

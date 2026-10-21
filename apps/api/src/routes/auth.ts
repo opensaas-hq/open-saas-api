@@ -1,9 +1,8 @@
 import { zValidator } from "@hono/zod-validator";
 import {
-  type RegistrationMode,
   createDatabaseInviteCodeValidator,
   createStrategyRegistry,
-  validateAndNormalizeEmail,
+  registerUser,
 } from "@opensaas/auth";
 import {
   fail,
@@ -56,31 +55,26 @@ authRouter.post(
     try {
       const body = c.req.valid("json");
 
-      // 1. Enforce email anti-abuse and normalization policy
-      const normalizedEmail = validateAndNormalizeEmail(body.email);
-
-      // 2. Determine system registration mode from validated configuration
-      //    (never raw `process.env`; an invalid value already failed at boot).
-      const registrationMode = getEnv().REGISTRATION_MODE as RegistrationMode;
-
-      // 3. Resolve the mode's strategy and validate server-side. The strategy
-      //    owns the mode's constraint (invite code checked against the DB,
-      //    payment verified through the port) — request flags are never trusted.
-      const outcome = await registrationRegistry
-        .require(registrationMode)
-        .validate({
-          mode: registrationMode,
-          email: normalizedEmail,
+      // The registration service owns the whole flow: normalize + anti-abuse,
+      // strategy validation (invite/payment, server-side), and persistence of
+      // user, account, organization, owner membership and any waitlist row —
+      // all in one transaction (§3.1).
+      const result = await registerUser(
+        {
+          email: body.email,
+          password: body.password,
+          name: body.name,
           inviteCode: body.inviteCode,
-        });
+        },
+        { env: getEnv(), registry: registrationRegistry },
+      );
 
-      // 4. Return the registration result in the standard envelope.
       return c.json(
         ok({
-          email: normalizedEmail,
-          status: outcome.status,
+          email: result.email,
+          status: result.status,
           message:
-            outcome.status === "waitlist"
+            result.status === "waitlist"
               ? "Registration received. You have been added to the waitlist."
               : "Registration successful.",
         }),

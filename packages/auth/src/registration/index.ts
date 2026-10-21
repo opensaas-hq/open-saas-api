@@ -6,3 +6,4 @@ export * from "./strategies/waiting-list";
 export * from "./strategies/invite-code";
 export * from "./strategies/paid-required";
 export * from "./validators/database-invite-code";
+export * from "./service";
