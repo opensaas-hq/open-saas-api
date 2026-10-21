@@ -6,7 +6,9 @@ import {
   envSchema,
   formatEnvError,
   getEnv,
+  getTrustedOrigins,
   initConfig,
+  parseTrustedOrigins,
   resetConfig,
 } from "../config";
 
@@ -177,6 +179,79 @@ describe("@opensaas/core - Config", () => {
       });
 
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe("Auth hardening knobs (§3.4)", () => {
+    test("rate limit, session and trusted-origin defaults are applied", () => {
+      const result = envSchema.safeParse(validEnv);
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.AUTH_RATE_LIMIT_ENABLED).toBe(true);
+      expect(result.data.AUTH_RATE_LIMIT_WINDOW_S).toBe(60);
+      expect(result.data.AUTH_RATE_LIMIT_MAX).toBe(100);
+      expect(result.data.SESSION_EXPIRES_IN_S).toBe(60 * 60 * 24 * 7);
+      expect(result.data.SESSION_UPDATE_AGE_S).toBe(60 * 60 * 24);
+      expect(result.data.TRUSTED_ORIGINS).toBeUndefined();
+    });
+
+    test("values are coerced from strings", () => {
+      const result = envSchema.safeParse({
+        ...validEnv,
+        AUTH_RATE_LIMIT_ENABLED: "false",
+        AUTH_RATE_LIMIT_WINDOW_S: "30",
+        AUTH_RATE_LIMIT_MAX: "5",
+        SESSION_EXPIRES_IN_S: "3600",
+        SESSION_UPDATE_AGE_S: "0",
+        TRUSTED_ORIGINS: "https://a.example, https://b.example",
+      });
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.AUTH_RATE_LIMIT_ENABLED).toBe(false);
+      expect(result.data.AUTH_RATE_LIMIT_WINDOW_S).toBe(30);
+      expect(result.data.AUTH_RATE_LIMIT_MAX).toBe(5);
+      expect(result.data.SESSION_EXPIRES_IN_S).toBe(3600);
+      expect(result.data.SESSION_UPDATE_AGE_S).toBe(0);
+      expect(result.data.TRUSTED_ORIGINS).toBe(
+        "https://a.example, https://b.example",
+      );
+    });
+
+    test("a zero rate-limit max is rejected naming the variable", () => {
+      const result = envSchema.safeParse({
+        ...validEnv,
+        AUTH_RATE_LIMIT_MAX: "0",
+      });
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.issues[0]?.path).toEqual(["AUTH_RATE_LIMIT_MAX"]);
+    });
+
+    test("parseTrustedOrigins trims, drops blanks and is order-preserving", () => {
+      expect(
+        parseTrustedOrigins(" https://a.example ,, https://b.example "),
+      ).toEqual(["https://a.example", "https://b.example"]);
+      expect(parseTrustedOrigins(undefined)).toEqual([]);
+      expect(parseTrustedOrigins("   ")).toEqual([]);
+    });
+
+    test("getTrustedOrigins always includes BETTER_AUTH_URL and de-duplicates", () => {
+      const env = createEnv({
+        ...validEnv,
+        BETTER_AUTH_URL: "https://app.example",
+        TRUSTED_ORIGINS: "https://app.example, https://admin.example",
+      });
+
+      expect(getTrustedOrigins(env)).toEqual([
+        "https://app.example",
+        "https://admin.example",
+      ]);
+    });
+
+    test("getTrustedOrigins falls back to BETTER_AUTH_URL when unset", () => {
+      const env = createEnv(validEnv);
+
+      expect(getTrustedOrigins(env)).toEqual([validEnv.BETTER_AUTH_URL]);
     });
   });
 

@@ -2,6 +2,7 @@ import { ConflictError, type Env, ValidationError } from "@opensaas/core";
 import { createWaitlistEntry, withRawTransaction } from "@opensaas/database";
 import { createAuth } from "../auth";
 import { validateAndNormalizeEmail } from "../email-policy";
+import type { EmailSender } from "../ports/email";
 import type { StrategyRegistry } from "./registry";
 import type { RegistrationStatus } from "./types";
 
@@ -21,6 +22,12 @@ export type RegisterUserInput = {
 export type RegisterUserDependencies = {
   env: Env;
   registry: StrategyRegistry;
+  /**
+   * Outbound email port forwarded to Better Auth so the sign-up verification
+   * email goes through the same injectable sender (§3.4). Optional; defaults to
+   * the non-delivering sender.
+   */
+  emailSender?: EmailSender;
 };
 
 /** Result of a successful registration. */
@@ -75,7 +82,7 @@ export async function registerUser(
   input: RegisterUserInput,
   dependencies: RegisterUserDependencies,
 ): Promise<RegisterUserResult> {
-  const { env, registry } = dependencies;
+  const { env, registry, emailSender } = dependencies;
 
   const email = validateAndNormalizeEmail(input.email);
   const mode = env.REGISTRATION_MODE;
@@ -96,7 +103,7 @@ export async function registerUser(
   return await withRawTransaction(async (tx) => {
     // Bind Better Auth to the transaction so its user/account inserts roll back
     // together with our organization/member/waitlist rows.
-    const txAuth = createAuth(env, tx);
+    const txAuth = createAuth(env, tx, { emailSender });
 
     let userId: string;
     try {

@@ -85,6 +85,30 @@ export const envSchema = z.object({
     .default("false")
     .transform((value) => value === "true"),
   DISPOSABLE_EMAIL_DOMAINS: z.string().optional(),
+  // Comma-separated allowlist of browser origins accepted by Better Auth's
+  // CSRF/origin check (§3.4). The same list feeds the API CORS config (§4.5).
+  // When unset, only `BETTER_AUTH_URL` is trusted.
+  TRUSTED_ORIGINS: z.string().optional(),
+  // Better Auth built-in rate limiter (§3.4). Enabled by default; the window and
+  // max are per auth route-class.
+  AUTH_RATE_LIMIT_ENABLED: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+  AUTH_RATE_LIMIT_WINDOW_S: z.coerce.number().int().positive().default(60),
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+  // Session lifetime policy (§3.4). `expiresIn` is the absolute lifetime;
+  // `updateAge` is how often an active session's expiry is refreshed.
+  SESSION_EXPIRES_IN_S: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60 * 60 * 24 * 7),
+  SESSION_UPDATE_AGE_S: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .default(60 * 60 * 24),
   // An empty string (e.g. an unset `.env` entry) falls back to the default
   // instead of being treated as an invalid value.
   REGISTRATION_MODE: z.preprocess(
@@ -92,6 +116,31 @@ export const envSchema = z.object({
     z.enum(REGISTRATION_MODES).default("public"),
   ),
 });
+
+/**
+ * Parse a comma-separated origin allowlist, trimming blanks. Pure and
+ * order-preserving so it can be unit-tested directly.
+ */
+export const parseTrustedOrigins = (raw: string | undefined): string[] => {
+  if (!raw || raw.trim() === "") return [];
+  return raw
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+};
+
+/**
+ * The effective trusted-origin allowlist: the origins configured through
+ * `TRUSTED_ORIGINS`, always including the app's own `BETTER_AUTH_URL`. This is
+ * the single source of truth shared by Better Auth's `trustedOrigins` (§3.4)
+ * and the API CORS allowlist (§4.5).
+ */
+export const getTrustedOrigins = (env: Env = getEnv()): string[] => [
+  ...new Set([
+    env.BETTER_AUTH_URL,
+    ...parseTrustedOrigins(env.TRUSTED_ORIGINS),
+  ]),
+];
 
 /** Configuration type inferred from the schema. */
 export type Env = z.infer<typeof envSchema>;
