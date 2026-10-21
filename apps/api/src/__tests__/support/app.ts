@@ -137,3 +137,52 @@ export const createOrganization = async (
       body: JSON.stringify(organization),
     }),
   );
+
+/** A signed-up user owning an organization, ready to call tenant routes. */
+export type TestTenant = {
+  /** Cookie that carries the session of the user. */
+  cookie: string;
+  /** Id of the organization the session is active on. */
+  organizationId: string;
+  /** Id of the user. */
+  userId: string;
+};
+
+/**
+ * Sign a user up and create an organization for them, so the session carries
+ * an active organization and an `owner` membership (§4.3).
+ */
+export const createTenant = async (
+  app: Hono<AppEnv>,
+  user: TestUser & { slug: string },
+): Promise<TestTenant> => {
+  const { res, cookie } = await signUp(app, user);
+
+  if (res.status !== 200) {
+    throw new Error(`sign-up failed with status ${res.status}`);
+  }
+
+  const signUpBody = (await res.json()) as { user?: { id?: string } };
+  const created = await createOrganization(app, cookie, {
+    name: user.name,
+    slug: user.slug,
+  });
+
+  if (created.status !== 200) {
+    throw new Error(
+      `organization creation failed with status ${created.status}`,
+    );
+  }
+
+  const organization = (await created.json()) as { id?: string };
+
+  if (!organization.id || !signUpBody.user?.id) {
+    throw new Error("the sign-up or the organization response is incomplete");
+  }
+
+  return {
+    cookie,
+    organizationId: organization.id,
+    userId: signUpBody.user.id,
+  };
+};

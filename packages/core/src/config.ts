@@ -109,6 +109,11 @@ export const envSchema = z.object({
     .int()
     .nonnegative()
     .default(60 * 60 * 24),
+  // Membership cache TTL (§4.3). The tenant middleware resolves the role of a
+  // user in the active organization through a short-lived in-memory cache, so
+  // a burst of requests does not turn into a burst of `member` lookups. The
+  // TTL bounds how long a role change can stay invisible.
+  MEMBERSHIP_CACHE_TTL_S: z.coerce.number().int().nonnegative().default(30),
   // An empty string (e.g. an unset `.env` entry) falls back to the default
   // instead of being treated as an invalid value.
   REGISTRATION_MODE: z.preprocess(

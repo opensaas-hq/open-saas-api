@@ -14,6 +14,8 @@ import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { contactsRouter } from "./routes/contacts";
 import { registrationRouter } from "./routes/registration";
+import { createBranchesService } from "./services/branches.service";
+import { createMembershipService } from "./services/membership.service";
 import type { AppEnv } from "./types";
 
 /**
@@ -47,16 +49,26 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnv> => {
   const { env, db, auth, logger } = dependencies;
   const app = new Hono<AppEnv>();
 
+  // The services are built once per app: the membership cache must survive
+  // across requests, so it cannot be created per request (§4.3).
+  const services = {
+    membership: createMembershipService({
+      ttlSeconds: env.MEMBERSHIP_CACHE_TTL_S,
+    }),
+    branches: createBranchesService(),
+  };
+
   // Dependency-injection slots (§4.7): expose the validated config, the
-  // database handle, the auth instance and the logger on the request context
-  // so downstream middleware/handlers read them from `c.get(...)` instead of
-  // reaching for module globals. Registered before any route so every request
-  // sees them.
+  // database handle, the auth instance, the logger and the services on the
+  // request context so downstream middleware/handlers read them from
+  // `c.get(...)` instead of reaching for module globals. Registered before any
+  // route so every request sees them.
   app.use("*", async (c, next) => {
     c.set("env", env);
     c.set("db", db);
     c.set("auth", auth);
     c.set("logger", logger);
+    c.set("services", services);
     await next();
   });
 

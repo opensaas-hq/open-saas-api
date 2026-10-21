@@ -6,7 +6,9 @@ import {
   withTransaction,
 } from "@opensaas/database";
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { z } from "zod";
+import { requirePermission } from "../middleware/rbac";
 import { tenantContextMiddleware } from "../middleware/tenant";
 import type { AppEnv } from "../types";
 
@@ -33,6 +35,28 @@ export const contactsQuerySchema = z.object({
   branchId: z.uuid().optional(),
   search: z.string().optional(),
 });
+
+/**
+ * Assert that every branch referenced by a payload belongs to the tenant.
+ *
+ * The branch of a request header or query string is checked by the tenant
+ * middleware; the branches of a request body are checked here, because the
+ * middleware never reads the body (§4.3).
+ */
+const assertBranchesBelongToTenant = async (
+  c: Context<AppEnv>,
+  organizationId: string,
+  branchIds: (string | undefined)[],
+): Promise<void> => {
+  const unique = [...new Set(branchIds.filter((id) => id !== undefined))];
+
+  for (const branchId of unique) {
+    await c.get("services").branches.assertBelongsToOrganization({
+      organizationId,
+      branchId,
+    });
+  }
+};
 
 // GET /api/contacts
 contactsRouter.get("/", async (c) => {
@@ -63,6 +87,10 @@ contactsRouter.post("/", async (c) => {
     throw fromZodError(parsed.error, "Invalid contact data");
   }
 
+  await assertBranchesBelongToTenant(c, tenant.organizationId, [
+    parsed.data.branchId,
+  ]);
+
   const newContact = await createContact({
     ...parsed.data,
     organizationId: tenant.organizationId,
@@ -79,7 +107,9 @@ const bulkContactSchema = z.object({
     .min(1, "At least one contact is required"),
 });
 
-contactsRouter.post("/bulk", async (c) => {
+// Bulk import is reserved to the roles that can change a whole tenant's
+// dataset at once (§4.3 permission matrix).
+contactsRouter.post("/bulk", requirePermission("contacts:bulk"), async (c) => {
   const tenant = c.get("tenant");
   const body = await c.req.json();
 
@@ -87,6 +117,12 @@ contactsRouter.post("/bulk", async (c) => {
   if (!parsed.success) {
     throw fromZodError(parsed.error, "Invalid bulk contacts data");
   }
+
+  await assertBranchesBelongToTenant(
+    c,
+    tenant.organizationId,
+    parsed.data.contacts.map((item) => item.branchId),
+  );
 
   const insertedContacts = await withTransaction({
     organizationId: tenant.organizationId,

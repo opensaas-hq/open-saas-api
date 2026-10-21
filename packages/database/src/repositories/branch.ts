@@ -30,6 +30,41 @@ export type DeleteBranchOptions = {
   tx?: Transaction;
 };
 
+/** Options for {@link getBranchById}: the tenant scopes the lookup. */
+export type GetBranchByIdOptions = {
+  organizationId: string;
+  id: string;
+  tx?: Transaction;
+};
+
+/**
+ * Read one branch of one organization.
+ *
+ * The organization is part of the `WHERE`, so a branch of another tenant is
+ * reported as missing instead of being returned: the caller cannot use this
+ * lookup to probe another tenant's data. Runs with the tenant GUC set, so RLS
+ * confirms the same scoping (§2.5).
+ */
+export async function getBranchById(options: GetBranchByIdOptions) {
+  const rows = await runInTenantContext({
+    organizationId: options.organizationId,
+    tx: options.tx,
+    run: async (tx) =>
+      await tx
+        .select()
+        .from(branches)
+        .where(
+          and(
+            eq(branches.id, options.id),
+            eq(branches.organizationId, options.organizationId),
+          ),
+        )
+        .limit(1),
+  });
+
+  return rows[0];
+}
+
 /**
  * List branches for one organization. `organizationId` is required and always
  * applied in the `WHERE`; the query runs with the tenant GUC set (§2.5.2).

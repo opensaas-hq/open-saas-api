@@ -1,6 +1,8 @@
 import type { AuthInstance } from "@opensaas/auth";
 import type { Env, Logger } from "@opensaas/core";
 import type { Database } from "@opensaas/database";
+import type { BranchesService } from "./services/branches.service";
+import type { MembershipService, Role } from "./services/membership.service";
 
 /**
  * Session payload inferred from the Better Auth instance (§4.7).
@@ -22,6 +24,16 @@ export type SessionRecord = AuthSession["session"];
 export type TenantContext = {
   organizationId: string;
   branchId?: string;
+  /** Role of the user inside the active organization, resolved from `member`. */
+  role: Role;
+};
+
+/** The application services, injected as a single slot (§4.4). */
+export type AppServices = {
+  /** Membership lookups and role changes (§4.3). */
+  membership: MembershipService;
+  /** Branch ownership rules (§4.3). */
+  branches: BranchesService;
 };
 
 /**
@@ -37,6 +49,7 @@ export type AppVariables = {
   db: Database;
   auth: AuthInstance;
   logger: Logger;
+  services: AppServices;
   user: SessionUser;
   session: SessionRecord;
   tenant: TenantContext;
