@@ -5,6 +5,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, organization } from "better-auth/plugins";
 import { type EmailSender, noopEmailSender } from "./ports/email";
+import { extractTelemetryFromHeaders } from "./telemetry";
 
 /**
  * Drizzle executor the adapter can write through. A pooled `Database` and a
@@ -86,6 +87,18 @@ export const createAuth = (
     session: {
       expiresIn: env.SESSION_EXPIRES_IN_S,
       updateAge: env.SESSION_UPDATE_AGE_S,
+      // Custom telemetry columns (§3.5). Better Auth only persists fields it
+      // knows about, so each column the session-creation hook fills must be
+      // declared here; `ipAddress`/`userAgent` are built-in.
+      additionalFields: {
+        browser: { type: "string", required: false },
+        os: { type: "string", required: false },
+        deviceType: { type: "string", required: false },
+        language: { type: "string", required: false },
+        timezone: { type: "string", required: false },
+        country: { type: "string", required: false },
+        city: { type: "string", required: false },
+      },
     },
     emailAndPassword: {
       enabled: true,
@@ -119,6 +132,40 @@ export const createAuth = (
       organization(), // Better Auth native organization management
       bearer(), // API Keys / Bearer Token support for stateless requests
     ],
+    databaseHooks: {
+      session: {
+        create: {
+          // Populate the session telemetry columns from the request headers
+          // (§3.5). Everything derivable without an external service is filled
+          // here; `country`/`city` come from Cloudflare geo headers when a proxy
+          // sets them, otherwise they stay null. No column is left always-null
+          // by omission — each has a real source (headers/UA/IP).
+          before: async (session, ctx) => {
+            if (!ctx?.headers) return;
+            const telemetry = extractTelemetryFromHeaders(ctx.headers);
+            return {
+              data: {
+                ...session,
+                // Better Auth already resolved the socket IP; keep it when our
+                // header-based extraction only fell back to the loopback default.
+                ipAddress:
+                  telemetry.ipAddress === "127.0.0.1" && session.ipAddress
+                    ? session.ipAddress
+                    : telemetry.ipAddress,
+                userAgent: telemetry.userAgent,
+                browser: telemetry.browser,
+                os: telemetry.os,
+                deviceType: telemetry.deviceType,
+                language: telemetry.language,
+                timezone: telemetry.timezone,
+                country: telemetry.country,
+                city: telemetry.city,
+              },
+            };
+          },
+        },
+      },
+    },
   });
 };
 

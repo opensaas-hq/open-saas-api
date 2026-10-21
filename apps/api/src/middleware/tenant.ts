@@ -1,4 +1,4 @@
-import { auth, extractTelemetryFromHeaders } from "@opensaas/auth";
+import { auth } from "@opensaas/auth";
 import { AppError, UnauthorizedError } from "@opensaas/core";
 import type { Context, Next } from "hono";
 
