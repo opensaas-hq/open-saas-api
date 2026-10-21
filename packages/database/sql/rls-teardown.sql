@@ -21,5 +21,12 @@ REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM opensa
 REVOKE USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public FROM opensaas_app;
 REVOKE USAGE ON SCHEMA public FROM opensaas_app;
 
+-- The default privileges granted by the setup must be revoked too, or a role
+-- created later would silently inherit them again.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES FROM opensaas_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE USAGE, SELECT ON SEQUENCES FROM opensaas_app;
+
 -- Drop the role only if it owns nothing and has no dependent objects.
 DROP ROLE IF EXISTS opensaas_app;

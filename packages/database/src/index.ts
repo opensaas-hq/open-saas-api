@@ -2,7 +2,8 @@ import * as schema from "./schema";
 
 export * from "./client";
 export * from "./schema";
-export * from "./health";
+export * from "./client/health";
+export * from "./client/rls";
 export * from "./repositories/organization";
 export * from "./repositories/member";
 export * from "./repositories/contact";

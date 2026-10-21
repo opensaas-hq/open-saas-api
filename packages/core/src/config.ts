@@ -128,6 +128,14 @@ export const envSchema = z.object({
   // is enforced by the DTO schema, so an oversized batch is a validation
   // failure and never reaches the transaction.
   BULK_MAX_CONTACTS: z.coerce.number().int().positive().default(1_000),
+  // Timeout of the readiness probe (§4.6), in milliseconds. The probe must
+  // answer within this budget: a health endpoint that hangs is worse than one
+  // that reports the database as down.
+  HEALTH_PROBE_TIMEOUT_MS: z.coerce.number().int().positive().default(2_000),
+  // Budget given to the in-flight requests when the process shuts down
+  // (§4.8), in milliseconds. When it elapses the process exits with a
+  // non-zero code instead of waiting forever.
+  SHUTDOWN_DRAIN_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
   // Write-endpoint rate limiter (§4.5). Better Auth guards its own routes
   // (§3.4); this one guards the project's write endpoints (registration and
   // the CRM writes). `false` disables the limiter.

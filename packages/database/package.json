@@ -13,6 +13,8 @@
     "db:push:test": "bun --env-file=../../.env.test drizzle-kit push",
     "db:rls:test": "bun --env-file=../../.env.test scripts/apply-rls.ts setup",
     "db:rls:test:down": "bun --env-file=../../.env.test scripts/apply-rls.ts teardown",
+    "db:rls:dev": "bun --env-file=../../.env scripts/apply-rls.ts setup",
+    "db:rls:dev:down": "bun --env-file=../../.env scripts/apply-rls.ts teardown",
     "test:unit": "bun test src/__tests__/like.test.ts src/__tests__/resilience.test.ts",
     "test:integration": "bun --env-file=../../.env.test test src/__tests__",
     "test": "bun --env-file=../../.env.test test src/__tests__",

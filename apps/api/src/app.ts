@@ -6,18 +6,20 @@ import {
   NotFoundError,
   TooManyRequestsError,
   fail,
-  ok,
   statusFromError,
 } from "@opensaas/core";
 import type { Database } from "@opensaas/database";
 import {
   DatabaseAuditRepository,
-  checkDatabaseHealth,
+  getBreaker,
+  probeDatabase,
 } from "@opensaas/database";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { type Lifecycle, createLifecycle } from "./lifecycle";
 import { createPipeline } from "./middleware/pipeline";
 import { createContactsRouter } from "./routes/contacts";
+import { type BreakerProbe, createHealthRouter } from "./routes/health";
 import { registrationRouter } from "./routes/registration";
 import { createBranchesService } from "./services/branches.service";
 import { createContactsService } from "./services/contacts.service";
@@ -41,6 +43,17 @@ export type AppDependencies = {
   auth: AuthInstance;
   /** Logger used by the error handler and the access log (§4.5). */
   logger: Logger;
+  /**
+   * Lifecycle of the process, shared with the shutdown controller (§4.8).
+   * Defaults to a fresh one, so an app built without a controller still
+   * reports itself as ready.
+   */
+  lifecycle?: Lifecycle;
+  /**
+   * Circuit breaker of the database client, read by the readiness endpoint
+   * (§4.6). Defaults to the process-wide breaker of the database package.
+   */
+  breaker?: BreakerProbe;
 };
 
 /**
@@ -54,6 +67,8 @@ export type AppDependencies = {
  */
 export const createApp = (dependencies: AppDependencies): Hono<AppEnv> => {
   const { env, db, auth, logger } = dependencies;
+  const lifecycle = dependencies.lifecycle ?? createLifecycle();
+  const breaker = dependencies.breaker ?? getBreaker();
   const app = new Hono<AppEnv>();
 
   // The services are built once per app: the membership cache must survive
@@ -91,7 +106,7 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnv> => {
   // Better Auth surface included: the correlation id, the access log, the
   // security headers, the CORS allowlist, the write rate limit and the body
   // size limit apply to every request the app answers.
-  for (const middleware of createPipeline({ env, logger })) {
+  for (const middleware of createPipeline({ env, logger, lifecycle })) {
     app.use("*", middleware);
   }
 
@@ -99,30 +114,23 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnv> => {
   // sign-out, session, and the organization plugin endpoints.
   app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
 
-  // Health check route (Liveness & Readiness)
-  app.get("/api/health", async (c) => {
-    // Read the DI slots rather than the module-level bindings, proving they are
-    // consumed (no dead scaffolding, §4.7 AC4).
-    const requestEnv = c.get("env");
-    const database = c.get("db");
-    const isDbConnected = await checkDatabaseHealth({ db: database });
-
-    if (!isDbConnected) {
-      logger.error("❌ Database health check failed: disconnected");
-    }
-
-    const statusCode = isDbConnected ? 200 : 503;
-
-    return c.json(
-      ok({
-        status: isDbConnected ? "ok" : "degraded",
-        environment: requestEnv.NODE_ENV,
-        database: isDbConnected ? "connected" : "disconnected",
-        timestamp: new Date().toISOString(),
-      }),
-      statusCode as ContentfulStatusCode,
-    );
-  });
+  // The health surface (§4.6): liveness, readiness and the deprecated
+  // `/api/health` alias. It is mounted on the root, before the tenant
+  // middleware, and it needs neither a session nor a tenant.
+  app.route(
+    "/",
+    createHealthRouter({
+      // The composition root is the only place that knows how to reach a
+      // database: the health route depends on the port, not on the driver.
+      db: {
+        isReachable: (timeoutMs) => probeDatabase({ db, timeoutMs }),
+      },
+      breaker,
+      timeoutMs: env.HEALTH_PROBE_TIMEOUT_MS,
+      lifecycle,
+      logger,
+    }),
+  );
 
   app.route("/api/registration", registrationRouter);
   app.route(

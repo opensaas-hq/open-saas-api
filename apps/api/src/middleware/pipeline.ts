@@ -9,8 +9,10 @@ import type { MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
+import type { Lifecycle } from "../lifecycle";
 import type { AppEnv } from "../types";
 import { createAccessLogMiddleware } from "./access-log";
+import { createInFlightMiddleware } from "./in-flight";
 import { createWriteRateLimiter } from "./rate-limit";
 import { requestIdMiddleware } from "./request-id";
 
@@ -20,6 +22,8 @@ export type PipelineOptions = {
   env: Env;
   /** Logger the access log writes to. */
   logger: Logger;
+  /** Lifecycle that tracks the in-flight requests, for the drain (§4.8). */
+  lifecycle: Lifecycle;
 };
 
 /**
@@ -68,6 +72,9 @@ export const createPipeline = (
 
   return [
     requestIdMiddleware,
+    // The in-flight tracker wraps every request, so the shutdown controller
+    // knows when the drain is over (§4.8).
+    createInFlightMiddleware(options.lifecycle),
     createAccessLogMiddleware({ logger }),
     secureHeaders(),
     cors({

@@ -5,9 +5,11 @@ import {
   createEnv,
   createLogger,
 } from "@opensaas/core";
-import { db } from "@opensaas/database";
+import { type Database, db } from "@opensaas/database";
 import type { Hono } from "hono";
 import { createApp } from "../../app";
+import type { Lifecycle } from "../../lifecycle";
+import type { BreakerProbe } from "../../routes/health";
 import type { AppEnv } from "../../types";
 
 /**
@@ -37,6 +39,10 @@ const baseEnvSource: Record<string, unknown> = {
   // and contacts in a loop and would exhaust a shared budget. The suite that
   // covers the limiter enables it explicitly.
   WRITE_RATE_LIMIT_ENABLED: "false",
+  // The suites run without row-level security: the enforcement is proved by
+  // the dedicated RLS suite in the database package, which applies the
+  // bootstrap itself (§2.5).
+  RLS_ENABLED: "false",
 };
 
 /**
@@ -62,6 +68,15 @@ export type TestAppOptions = {
    * (the access log, §4.5) instead of writing them to stdout.
    */
   destination?: DestinationStream;
+  /**
+   * Database handle the app uses. Override it to simulate an unreachable
+   * database, e.g. a handle pointing at a closed port (§4.6).
+   */
+  db?: Database;
+  /** Circuit breaker the readiness endpoint reads (§4.6). */
+  breaker?: BreakerProbe;
+  /** Lifecycle the readiness endpoint and the shutdown controller share (§4.8). */
+  lifecycle?: Lifecycle;
 };
 
 /**
@@ -78,7 +93,17 @@ export const createTestApp = (
   const logger = createLogger(env, options.destination);
   const auth = createAuth(env, db);
 
-  return { app: createApp({ env, db, auth, logger }), env };
+  return {
+    app: createApp({
+      env,
+      db: options.db ?? db,
+      auth,
+      logger,
+      breaker: options.breaker,
+      lifecycle: options.lifecycle,
+    }),
+    env,
+  };
 };
 
 /**

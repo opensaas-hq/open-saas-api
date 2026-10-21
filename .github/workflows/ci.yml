@@ -54,6 +54,9 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test
           BETTER_AUTH_SECRET: ci_secret_key_123456789_opensaas
           BETTER_AUTH_URL: http://localhost:3000
+          # The suites run without row-level security; the "Row-Level Security
+          # proof" job applies the bootstrap and turns the flag on (§2.5).
+          RLS_ENABLED: "false"
         run: bun test
 
   rls:

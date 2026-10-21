@@ -36,6 +36,33 @@ export const getRequestContext = (): RequestContext | undefined =>
   requestContextStorage.getStore();
 
 /**
+ * Resolve the pretty transport target.
+ *
+ * `pino-pretty` is a dev dependency of this package, so it is not resolvable
+ * from the application that consumes the logger (bun installs the
+ * dependencies of a package in its own tree). The target is therefore
+ * resolved here, from the package that declares it, and the transport is
+ * skipped when the resolution fails: a missing developer convenience must
+ * never break the boot of the process.
+ */
+const resolvePrettyTransport = ():
+  | { target: string; options: Record<string, unknown> }
+  | undefined => {
+  try {
+    return {
+      target: import.meta.resolve("pino-pretty"),
+      options: {
+        colorize: true,
+        ignore: "pid,hostname",
+        translateTime: "SYS:HH:MM:ss",
+      },
+    };
+  } catch {
+    return undefined;
+  }
+};
+
+/**
  * Build a logger from validated config. Pretty output in development, plain
  * JSON in production and in tests. Log level and environment come from the
  * validated `env` (never raw `process.env`).
@@ -56,6 +83,8 @@ export const getRequestContext = (): RequestContext | undefined =>
  */
 export const createLogger = (env: Env, destination?: DestinationStream) => {
   const isDevelopment = env.NODE_ENV === "development";
+  const pretty =
+    isDevelopment && !destination ? resolvePrettyTransport() : undefined;
 
   return pino(
     {
@@ -68,17 +97,7 @@ export const createLogger = (env: Env, destination?: DestinationStream) => {
           redact(object) as Record<string, unknown>,
       },
       // Pretty transport cannot coexist with an injected destination.
-      transport:
-        isDevelopment && !destination
-          ? {
-              target: "pino-pretty",
-              options: {
-                colorize: true,
-                ignore: "pid,hostname",
-                translateTime: "SYS:HH:MM:ss",
-              },
-            }
-          : undefined,
+      transport: pretty,
     },
     destination,
   );

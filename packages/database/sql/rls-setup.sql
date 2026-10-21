@@ -37,6 +37,16 @@ GRANT USAGE ON SCHEMA public TO opensaas_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO opensaas_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO opensaas_app;
 
+-- The same grants for the tables created *later* by the schema push: without
+-- the default privileges, a table added after this script would be invisible
+-- to the runtime role. The default privileges of the role that owns the
+-- schema (the deploy role) are what a new table inherits, so they are
+-- declared here.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO opensaas_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO opensaas_app;
+
 -- Enable and FORCE RLS so the owner is bound by the policies as well.
 ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contacts FORCE ROW LEVEL SECURITY;
