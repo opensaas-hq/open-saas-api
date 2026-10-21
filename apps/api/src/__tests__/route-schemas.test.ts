@@ -1,13 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { contactsQuerySchema, createContactSchema } from "../routes/contacts";
-import { registerSchema } from "../routes/registration";
+import {
+  contactsQuerySchema,
+  createContactRequestSchema,
+} from "../dto/contacts";
+import { registerRequestSchema } from "../dto/registration";
 
 // These exercise the real Zod v4 schemas used by the routes, so a regression in
 // validation (or a Zod upgrade) is caught without needing a database.
 
-describe("Apps/API - registerSchema", () => {
+describe("Apps/API - registerRequestSchema", () => {
   test("accepts a valid payload and trims the email", () => {
-    const result = registerSchema.safeParse({
+    const result = registerRequestSchema.safeParse({
       email: "  user@example.com  ",
       password: "supersecret",
       name: "Ada",
@@ -19,7 +22,7 @@ describe("Apps/API - registerSchema", () => {
   });
 
   test("rejects an invalid email", () => {
-    const result = registerSchema.safeParse({
+    const result = registerRequestSchema.safeParse({
       email: "not-an-email",
       password: "supersecret",
       name: "Ada",
@@ -31,7 +34,7 @@ describe("Apps/API - registerSchema", () => {
   });
 
   test("rejects a password shorter than 8 characters", () => {
-    const result = registerSchema.safeParse({
+    const result = registerRequestSchema.safeParse({
       email: "user@example.com",
       password: "short",
       name: "Ada",
@@ -43,7 +46,7 @@ describe("Apps/API - registerSchema", () => {
   });
 
   test("inviteCode is optional", () => {
-    const result = registerSchema.safeParse({
+    const result = registerRequestSchema.safeParse({
       email: "user@example.com",
       password: "supersecret",
       name: "Ada",
@@ -54,7 +57,7 @@ describe("Apps/API - registerSchema", () => {
   });
 
   test("a client-supplied payment flag is not part of the schema (§3.2)", () => {
-    const parsed = registerSchema.parse({
+    const parsed = registerRequestSchema.parse({
       email: "user@example.com",
       password: "supersecret",
       name: "Ada",
@@ -65,9 +68,9 @@ describe("Apps/API - registerSchema", () => {
   });
 });
 
-describe("Apps/API - createContactSchema", () => {
+describe("Apps/API - createContactRequestSchema", () => {
   test("applies defaults for status, optIn and metadata", () => {
-    const result = createContactSchema.parse({ name: "Grace" });
+    const result = createContactRequestSchema.parse({ name: "Grace" });
 
     expect(result.status).toBe("active");
     expect(result.optIn).toBe(true);
@@ -76,15 +79,15 @@ describe("Apps/API - createContactSchema", () => {
 
   test("accepts an empty-string email but rejects a malformed one", () => {
     expect(
-      createContactSchema.safeParse({ name: "A", email: "" }).success,
+      createContactRequestSchema.safeParse({ name: "A", email: "" }).success,
     ).toBe(true);
     expect(
-      createContactSchema.safeParse({ name: "A", email: "bad" }).success,
+      createContactRequestSchema.safeParse({ name: "A", email: "bad" }).success,
     ).toBe(false);
   });
 
   test("rejects a non-uuid branchId", () => {
-    const result = createContactSchema.safeParse({
+    const result = createContactRequestSchema.safeParse({
       name: "A",
       branchId: "not-a-uuid",
     });
@@ -95,7 +98,7 @@ describe("Apps/API - createContactSchema", () => {
   });
 
   test("accepts arbitrary metadata under a string-keyed record", () => {
-    const result = createContactSchema.safeParse({
+    const result = createContactRequestSchema.safeParse({
       name: "A",
       metadata: { source: "import", count: 3 },
     });

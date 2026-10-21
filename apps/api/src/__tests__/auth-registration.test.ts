@@ -138,6 +138,33 @@ describeIfDb(
       expect(body.error.code).toBe("EMAIL_ALREADY_REGISTERED");
     });
 
+    test("a failed registration leaves zero partial rows (§4.4 AC3)", async () => {
+      const { app } = createTestApp({ REGISTRATION_MODE: "public" });
+
+      await register(app, {
+        email: "partial@example.com",
+        password: "password123",
+        name: "First",
+      });
+
+      // The second registration fails on the very first step of the
+      // transaction: nothing of it may survive, not even the organization or
+      // the membership the flow creates after the sign-up.
+      const res = await register(app, {
+        email: "partial@example.com",
+        password: "password123",
+        name: "Second",
+      });
+      expect(res.status).toBe(409);
+
+      const { db } = await import("@opensaas/database");
+
+      expect(await db.select().from(schema.user)).toHaveLength(1);
+      expect(await db.select().from(schema.account)).toHaveLength(1);
+      expect(await db.select().from(schema.organization)).toHaveLength(1);
+      expect(await db.select().from(schema.member)).toHaveLength(1);
+    });
+
     test("rejects invite_code mode if no code is provided", async () => {
       const { app } = createTestApp({ REGISTRATION_MODE: "invite_code" });
 

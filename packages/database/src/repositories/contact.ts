@@ -1,5 +1,5 @@
 import { and, count, eq, or, sql } from "drizzle-orm";
-import { type Transaction, runInTenantContext } from "../client";
+import { type Database, type Transaction, runInTenantContext } from "../client";
 import { type ContactStatus, contacts } from "../schema";
 import { toContainsLikePattern } from "./like";
 
@@ -18,6 +18,8 @@ export type ContactInput = {
 export type CreateContactOptions = ContactInput & {
   organizationId: string;
   tx?: Transaction;
+  /** Handle to run the write on. Defaults to the process-global proxy (TD-23). */
+  db?: Database;
 };
 
 /** Options for {@link createContactsBulk}: one tenant for the whole batch. */
@@ -25,6 +27,8 @@ export type CreateContactsBulkOptions = {
   organizationId: string;
   contacts: ContactInput[];
   tx?: Transaction;
+  /** Handle to run the write on. Defaults to the process-global proxy (TD-23). */
+  db?: Database;
 };
 
 /** Options for {@link getContactsByOrganization}: the tenant is required. */
@@ -36,6 +40,8 @@ export type GetContactsOptions = {
   branchId?: string;
   search?: string;
   tx?: Transaction;
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  db?: Database;
 };
 
 /**
@@ -78,6 +84,7 @@ export async function getContactsByOrganization(options: GetContactsOptions) {
   const { data, totalResult } = await runInTenantContext({
     organizationId: options.organizationId,
     tx: options.tx,
+    db: options.db,
     run: async (tx) => {
       const [data, totalResult] = await Promise.all([
         tx
@@ -110,6 +117,7 @@ export async function createContact(options: CreateContactOptions) {
   return await runInTenantContext({
     organizationId: options.organizationId,
     tx: options.tx,
+    db: options.db,
     run: async (tx) => {
       const [newContact] = await tx
         .insert(contacts)
@@ -152,6 +160,7 @@ export async function createContactsBulk(options: CreateContactsBulkOptions) {
   return await runInTenantContext({
     organizationId: options.organizationId,
     tx: options.tx,
+    db: options.db,
     run: async (tx) =>
       await tx.insert(contacts).values(valuesToInsert).returning(),
   });

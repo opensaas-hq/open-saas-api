@@ -1,11 +1,13 @@
 import { and, asc, eq } from "drizzle-orm";
-import { type Transaction, runInTenantContext } from "../client";
+import { type Database, type Transaction, runInTenantContext } from "../client";
 import { branches } from "../schema";
 
 /** Options for {@link listBranches}: the tenant is required. */
 export type ListBranchesOptions = {
   organizationId: string;
   tx?: Transaction;
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  db?: Database;
 };
 
 /** Options for {@link createBranch}: the tenant is required. */
@@ -13,6 +15,8 @@ export type CreateBranchOptions = {
   organizationId: string;
   name: string;
   tx?: Transaction;
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  db?: Database;
 };
 
 /** Options for {@link updateBranch}: the tenant scopes the update. */
@@ -21,6 +25,8 @@ export type UpdateBranchOptions = {
   id: string;
   name: string;
   tx?: Transaction;
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  db?: Database;
 };
 
 /** Options for {@link deleteBranch}: the tenant scopes the delete. */
@@ -28,6 +34,8 @@ export type DeleteBranchOptions = {
   organizationId: string;
   id: string;
   tx?: Transaction;
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  db?: Database;
 };
 
 /** Options for {@link getBranchById}: the tenant scopes the lookup. */
@@ -35,6 +43,8 @@ export type GetBranchByIdOptions = {
   organizationId: string;
   id: string;
   tx?: Transaction;
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  db?: Database;
 };
 
 /**
@@ -49,6 +59,7 @@ export async function getBranchById(options: GetBranchByIdOptions) {
   const rows = await runInTenantContext({
     organizationId: options.organizationId,
     tx: options.tx,
+    db: options.db,
     run: async (tx) =>
       await tx
         .select()
@@ -73,6 +84,7 @@ export async function listBranches(options: ListBranchesOptions) {
   return await runInTenantContext({
     organizationId: options.organizationId,
     tx: options.tx,
+    db: options.db,
     run: async (tx) =>
       await tx
         .select()
@@ -87,6 +99,7 @@ export async function createBranch(options: CreateBranchOptions) {
   return await runInTenantContext({
     organizationId: options.organizationId,
     tx: options.tx,
+    db: options.db,
     run: async (tx) => {
       const [branch] = await tx
         .insert(branches)
@@ -109,6 +122,7 @@ export async function updateBranch(options: UpdateBranchOptions) {
   return await runInTenantContext({
     organizationId: options.organizationId,
     tx: options.tx,
+    db: options.db,
     run: async (tx) => {
       const [branch] = await tx
         .update(branches)
@@ -134,6 +148,7 @@ export async function deleteBranch(options: DeleteBranchOptions) {
   return await runInTenantContext({
     organizationId: options.organizationId,
     tx: options.tx,
+    db: options.db,
     run: async (tx) => {
       const [branch] = await tx
         .delete(branches)

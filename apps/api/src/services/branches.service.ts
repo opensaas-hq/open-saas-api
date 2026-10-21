@@ -1,5 +1,5 @@
 import { NotFoundError } from "@opensaas/core";
-import { getBranchById } from "@opensaas/database";
+import { type Database, getBranchById } from "@opensaas/database";
 
 /** Reads one branch of one organization. */
 export type BranchLookup = (input: {
@@ -26,6 +26,11 @@ export type BranchesService = {
 export type BranchesServiceDeps = {
   /** Read one branch of one organization. Defaults to the repository. */
   lookup?: BranchLookup;
+  /**
+   * Handle the repository runs on. Defaults to the process-global proxy; the
+   * app factory injects its own handle (TD-23).
+   */
+  db?: Database;
 };
 
 /**
@@ -41,7 +46,7 @@ export const createBranchesService = (
   const lookup: BranchLookup =
     deps.lookup ??
     (async ({ organizationId, branchId }) =>
-      await getBranchById({ organizationId, id: branchId }));
+      await getBranchById({ organizationId, id: branchId, db: deps.db }));
 
   const assertBelongsToOrganization: BranchesService["assertBelongsToOrganization"] =
     async ({ organizationId, branchId }) => {

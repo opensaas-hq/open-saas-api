@@ -1,5 +1,9 @@
 import { ConflictError, type Env, ValidationError } from "@opensaas/core";
-import { createWaitlistEntry, withRawTransaction } from "@opensaas/database";
+import {
+  type Database,
+  createWaitlistEntry,
+  withRawTransaction,
+} from "@opensaas/database";
 import { createAuth } from "../auth";
 import {
   getDisposableDomains,
@@ -31,6 +35,11 @@ export type RegisterUserDependencies = {
    * the non-delivering sender.
    */
   emailSender?: EmailSender;
+  /**
+   * Handle the registration transaction runs on. Optional; defaults to the
+   * process-global proxy, so an injected handle reaches the data layer (TD-23).
+   */
+  db?: Database;
 };
 
 /** Result of a successful registration. */
@@ -85,7 +94,7 @@ export async function registerUser(
   input: RegisterUserInput,
   dependencies: RegisterUserDependencies,
 ): Promise<RegisterUserResult> {
-  const { env, registry, emailSender } = dependencies;
+  const { env, registry, emailSender, db } = dependencies;
 
   const email = validateAndNormalizeEmail(
     input.email,
@@ -159,5 +168,5 @@ export async function registerUser(
       email,
       status: outcome.status,
     };
-  });
+  }, db);
 }

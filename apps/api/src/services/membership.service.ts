@@ -1,4 +1,6 @@
+import { type AuditPort, computeAuditDiff } from "@opensaas/core";
 import {
+  type Database,
   getMemberRole,
   removeMember,
   updateMemberRole,
@@ -55,6 +57,8 @@ export type MembershipService = {
     userId: string;
     organizationId: string;
     role: Role;
+    /** The user performing the change; recorded in the audit event. */
+    actorId: string;
   }) => Promise<void>;
   /**
    * Remove a membership and invalidate its cached value.
@@ -62,6 +66,8 @@ export type MembershipService = {
   removeMembership: (input: {
     userId: string;
     organizationId: string;
+    /** The user performing the change; recorded in the audit event. */
+    actorId: string;
   }) => Promise<void>;
 };
 
@@ -75,6 +81,16 @@ export type MembershipServiceDeps = {
   update?: MembershipUpdate;
   /** Clock used to stamp the cache entries. Defaults to `Date.now`. */
   now?: () => number;
+  /**
+   * Sink for the audit events of the membership changes. Optional: a service
+   * built without one simply does not audit.
+   */
+  audit?: AuditPort;
+  /**
+   * Handle the repository runs on. Defaults to the process-global proxy; the
+   * app factory injects its own handle (TD-23).
+   */
+  db?: Database;
 };
 
 /**
@@ -107,11 +123,11 @@ export const createMembershipService = (
   const lookup: MembershipLookup =
     deps.lookup ??
     (async ({ userId, organizationId }) =>
-      await getMemberRole({ userId, organizationId }));
+      await getMemberRole({ userId, organizationId, db: deps.db }));
   const update: MembershipUpdate =
     deps.update ??
     (async ({ userId, organizationId, role }) => {
-      await updateMemberRole({ userId, organizationId, role });
+      await updateMemberRole({ userId, organizationId, role, db: deps.db });
     });
 
   const cache = new Map<string, { role: Role; expiresAt: number }>();
@@ -154,17 +170,43 @@ export const createMembershipService = (
     userId,
     organizationId,
     role,
+    actorId,
   }) => {
+    const previousRole = await getRole({ userId, organizationId });
+
     await update({ userId, organizationId, role });
     invalidate({ userId, organizationId });
+
+    await deps.audit?.record({
+      action: "member.role_changed",
+      entityType: "member",
+      entityId: userId,
+      actorId,
+      organizationId,
+      changes: computeAuditDiff({ role: previousRole ?? null }, { role }),
+      timestamp: new Date().toISOString(),
+    });
   };
 
   const removeMembership: MembershipService["removeMembership"] = async ({
     userId,
     organizationId,
+    actorId,
   }) => {
-    await removeMember({ userId, organizationId });
+    const previousRole = await getRole({ userId, organizationId });
+
+    await removeMember({ userId, organizationId, db: deps.db });
     invalidate({ userId, organizationId });
+
+    await deps.audit?.record({
+      action: "member.removed",
+      entityType: "member",
+      entityId: userId,
+      actorId,
+      organizationId,
+      changes: computeAuditDiff({ role: previousRole ?? null }, { role: null }),
+      timestamp: new Date().toISOString(),
+    });
   };
 
   return { getRole, invalidate, setRole, removeMembership };

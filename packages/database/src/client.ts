@@ -265,11 +265,15 @@ export const resetDb = (): void => {
  * Run `callback` inside a single database transaction, rolling back on any
  * throw. No tenant context is set — use this only for flows that are not
  * tenant-scoped (migrations, health probes, framework tables).
+ *
+ * `db` overrides the process-global handle, so an injected handle reaches the
+ * data layer instead of the module proxy (TD-23).
  */
 export async function withRawTransaction<T>(
   callback: (tx: Transaction) => Promise<T>,
+  db?: Database,
 ): Promise<T> {
-  return await getDb().transaction(callback);
+  return await (db ?? getDb()).transaction(callback);
 }
 
 /** Options for {@link withTransaction}: the tenant scopes the transaction. */
@@ -278,6 +282,11 @@ export type TenantTransactionOptions<T> = {
   organizationId: string;
   /** The work to perform inside the tenant-scoped transaction. */
   callback: (tx: Transaction) => Promise<T>;
+  /**
+   * Handle to run the transaction on. Defaults to the process-global proxy;
+   * an injected handle keeps the transaction on the caller's connection (TD-23).
+   */
+  db?: Database;
 };
 
 /**
@@ -325,7 +334,7 @@ export async function withTransaction<T>(
   options: TenantTransactionOptions<T>,
 ): Promise<T> {
   const organizationId = requireOrganizationId(options.organizationId);
-  return await getDb().transaction(async (tx) => {
+  return await (options.db ?? getDb()).transaction(async (tx) => {
     await setTenantGuc(tx, organizationId);
     return await options.callback(tx);
   });
@@ -342,6 +351,11 @@ export type TenantContextOptions<T> = {
    * GUC (e.g. via {@link withTransaction}) and no new transaction is opened.
    */
   tx?: Transaction;
+  /**
+   * Handle to run the operation on. Defaults to the process-global proxy; an
+   * injected handle keeps the query on the caller's connection (TD-23).
+   */
+  db?: Database;
 };
 
 /**
@@ -359,7 +373,7 @@ export async function runInTenantContext<T>(
   if (options.tx) {
     return await options.run(options.tx);
   }
-  return await getDb().transaction(async (tx) => {
+  return await (options.db ?? getDb()).transaction(async (tx) => {
     await setTenantGuc(tx, organizationId);
     return await options.run(tx);
   });

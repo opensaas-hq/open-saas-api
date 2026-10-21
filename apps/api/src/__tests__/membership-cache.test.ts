@@ -73,6 +73,7 @@ describe("Apps/API - Membership service cache (§4.3)", () => {
       userId: "u1",
       organizationId: "o1",
       role: "admin",
+      actorId: "admin-1",
     });
 
     expect(await service.getRole({ userId: "u1", organizationId: "o1" })).toBe(
@@ -111,7 +112,11 @@ describe("Apps/API - Membership service cache (§4.3)", () => {
     );
 
     member = undefined;
-    await service.removeMembership({ userId: "u1", organizationId: "o1" });
+    await service.removeMembership({
+      userId: "u1",
+      organizationId: "o1",
+      actorId: "admin-1",
+    });
 
     expect(
       await service.getRole({ userId: "u1", organizationId: "o1" }),

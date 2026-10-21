@@ -9,13 +9,18 @@ import {
   statusFromError,
 } from "@opensaas/core";
 import type { Database } from "@opensaas/database";
-import { checkDatabaseHealth } from "@opensaas/database";
+import {
+  DatabaseAuditRepository,
+  checkDatabaseHealth,
+} from "@opensaas/database";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { contactsRouter } from "./routes/contacts";
 import { registrationRouter } from "./routes/registration";
 import { createBranchesService } from "./services/branches.service";
+import { createContactsService } from "./services/contacts.service";
 import { createMembershipService } from "./services/membership.service";
+import { createRegistrationService } from "./services/registration.service";
 import type { AppEnv } from "./types";
 
 /**
@@ -50,12 +55,20 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnv> => {
   const app = new Hono<AppEnv>();
 
   // The services are built once per app: the membership cache must survive
-  // across requests, so it cannot be created per request (§4.3).
+  // across requests, so it cannot be created per request (§4.3). The audit
+  // port is the database-backed implementation, shared by every service that
+  // mutates state (§4.4).
+  const audit = new DatabaseAuditRepository(undefined, db);
+  const branches = createBranchesService({ db });
   const services = {
     membership: createMembershipService({
       ttlSeconds: env.MEMBERSHIP_CACHE_TTL_S,
+      audit,
+      db,
     }),
-    branches: createBranchesService(),
+    branches,
+    contacts: createContactsService({ branches, audit, db }),
+    registration: createRegistrationService({ env, audit, db }),
   };
 
   // Dependency-injection slots (§4.7): expose the validated config, the

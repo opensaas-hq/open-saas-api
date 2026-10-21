@@ -1,7 +1,7 @@
 import type { AuditEvent, AuditPort } from "@opensaas/core";
 import { TenantContextError, toAuditRecord } from "@opensaas/core";
 import { and, asc, eq } from "drizzle-orm";
-import { type Transaction, runInTenantContext } from "../client";
+import { type Database, type Transaction, runInTenantContext } from "../client";
 import { auditLog } from "../schema";
 
 /**
@@ -20,7 +20,10 @@ import { auditLog } from "../schema";
  * contract; see the dependency-graph note tracked in `technical-debt.md`.
  */
 export class DatabaseAuditRepository implements AuditPort {
-  constructor(private readonly executor: Transaction | undefined = undefined) {}
+  constructor(
+    private readonly executor: Transaction | undefined = undefined,
+    private readonly db: Database | undefined = undefined,
+  ) {}
 
   async record(event: AuditEvent): Promise<void> {
     if (this.executor) {
@@ -29,6 +32,7 @@ export class DatabaseAuditRepository implements AuditPort {
     }
     await runInTenantContext({
       organizationId: event.organizationId,
+      db: this.db,
       run: async (tx) => {
         await tx.insert(auditLog).values(toAuditValues(event));
       },
@@ -61,6 +65,7 @@ export class DatabaseAuditRepository implements AuditPort {
 
     await runInTenantContext({
       organizationId,
+      db: this.db,
       run: async (tx) => {
         await tx
           .insert(auditLog)
@@ -77,6 +82,8 @@ export type ListAuditRowsOptions = {
   entityId?: string;
   limit?: number;
   tx?: Transaction;
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  db?: Database;
 };
 
 /**
@@ -100,6 +107,7 @@ export async function listAuditRows(options: ListAuditRowsOptions) {
   return await runInTenantContext({
     organizationId: options.organizationId,
     tx: options.tx,
+    db: options.db,
     run: async (tx) =>
       await tx
         .select()

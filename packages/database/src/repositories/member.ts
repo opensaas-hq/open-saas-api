@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { db } from "../client";
+import { type Database, db } from "../client";
 import { member } from "../schema";
 
 /** A membership row as stored in the `member` table. */
@@ -11,12 +11,21 @@ export type MemberLookupOptions = {
   organizationId: string;
   /** The user the membership must belong to. */
   userId: string;
+  /**
+   * Handle to run the query on. Defaults to the process-global proxy, so an
+   * injected handle reaches the data layer (TD-23).
+   */
+  db?: Database;
 };
 
 /** Options for {@link listMembers}. */
 export type ListMembersOptions = {
   /** The organization whose memberships are listed. */
   organizationId: string;
+  /**
+   * Handle to run the query on. Defaults to the process-global proxy (TD-23).
+   */
+  db?: Database;
 };
 
 /** Options for {@link updateMemberRole}. */
@@ -36,7 +45,7 @@ export type UpdateMemberRoleOptions = MemberLookupOptions & {
 export async function getMember(
   options: MemberLookupOptions,
 ): Promise<MemberRecord | undefined> {
-  const [row] = await db
+  const [row] = await (options.db ?? db)
     .select()
     .from(member)
     .where(
@@ -66,7 +75,7 @@ export async function getMemberRole(
 export async function listMembers(
   options: ListMembersOptions,
 ): Promise<MemberRecord[]> {
-  return await db
+  return await (options.db ?? db)
     .select()
     .from(member)
     .where(eq(member.organizationId, options.organizationId));
@@ -80,7 +89,7 @@ export async function listMembers(
 export async function updateMemberRole(
   options: UpdateMemberRoleOptions,
 ): Promise<MemberRecord | undefined> {
-  const [row] = await db
+  const [row] = await (options.db ?? db)
     .update(member)
     .set({ role: options.role })
     .where(
@@ -101,7 +110,7 @@ export async function updateMemberRole(
 export async function removeMember(
   options: MemberLookupOptions,
 ): Promise<boolean> {
-  const rows = await db
+  const rows = await (options.db ?? db)
     .delete(member)
     .where(
       and(
