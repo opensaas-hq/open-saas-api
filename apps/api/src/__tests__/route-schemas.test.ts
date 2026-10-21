@@ -42,16 +42,26 @@ describe("Apps/API - registerSchema", () => {
     expect(result.error.issues[0]?.path).toEqual(["password"]);
   });
 
-  test("inviteCode and hasPaid are optional", () => {
+  test("inviteCode is optional", () => {
     const result = registerSchema.safeParse({
       email: "user@example.com",
       password: "supersecret",
       name: "Ada",
       inviteCode: "INVITE-1",
-      hasPaid: true,
     });
 
     expect(result.success).toBe(true);
+  });
+
+  test("a client-supplied payment flag is not part of the schema (§3.2)", () => {
+    const parsed = registerSchema.parse({
+      email: "user@example.com",
+      password: "supersecret",
+      name: "Ada",
+      hasPaid: true,
+    });
+
+    expect(parsed).not.toHaveProperty("hasPaid");
   });
 });
 
