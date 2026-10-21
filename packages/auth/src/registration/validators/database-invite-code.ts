@@ -1,5 +1,5 @@
+import { ConflictError } from "@opensaas/core";
 import {
-  type Transaction,
   consumeRegistrationCode,
   getRegistrationCode,
 } from "@opensaas/database";
@@ -54,10 +54,16 @@ export const createDatabaseInviteCodeValidator = (): InviteCodeValidator => ({
         const result = await consumeRegistrationCode({
           code,
           userId,
-          tx: tx as Transaction,
+          tx,
         });
         if (!result.consumed) {
-          throw new Error(`INVITE_CODE_CONSUME_FAILED:${result.reason}`);
+          // The pre-check passed but the code was consumed/expired by a
+          // concurrent request in between: a typed 409, never a 500.
+          throw new ConflictError(
+            "The invitation code is invalid or has already been used.",
+            { field: "inviteCode", reason: result.reason },
+            "INVITE_CODE_ALREADY_USED",
+          );
         }
       },
     };

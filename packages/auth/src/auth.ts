@@ -24,12 +24,6 @@ export type CreateAuthOptions = {
    * a capturing fake.
    */
   emailSender?: EmailSender;
-  /**
-   * From address for outbound auth emails. Kept as an explicit option (not an
-   * env var) because delivery is provider-specific and out of scope until the
-   * messaging milestone.
-   */
-  emailFrom?: string;
 };
 
 /**
@@ -51,7 +45,6 @@ export const createAuth = (
   options: CreateAuthOptions = {},
 ) => {
   const emailSender = options.emailSender ?? noopEmailSender;
-  const emailFrom = options.emailFrom ?? "auth@opensaas.local";
 
   return betterAuth({
     database: drizzleAdapter(database as Database, {

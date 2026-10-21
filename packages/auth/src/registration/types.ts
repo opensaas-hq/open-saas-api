@@ -1,4 +1,5 @@
 import type { Env } from "@opensaas/core";
+import type { Transaction } from "@opensaas/database";
 
 /** Canonical registration modes, shared with the config schema. */
 export type RegistrationMode = Env["REGISTRATION_MODE"];
@@ -36,7 +37,7 @@ export type RegistrationOutcome = {
    * exists. Receives the new user id. Optional: modes without persistence
    * side effects (e.g. `public`) leave it undefined.
    */
-  onCommit?: (userId: string, tx: unknown) => Promise<void>;
+  onCommit?: (userId: string, tx: Transaction) => Promise<void>;
 };
 
 /**

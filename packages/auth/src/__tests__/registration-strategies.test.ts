@@ -64,7 +64,9 @@ describe("@opensaas/auth - Registration strategies (§3.2)", () => {
 
       expect(outcome.status).toBe("active");
       expect(consumedWith).toBeUndefined();
-      await outcome.onCommit?.("user_1", {});
+      // The test only asserts the callback fires with the user id; the
+      // transaction handle is opaque to it, so a stub is fine.
+      await outcome.onCommit?.("user_1", {} as never);
       expect(consumedWith).toBe("user_1");
     });
   });

@@ -1,4 +1,5 @@
 import { ValidationError } from "@opensaas/core";
+import type { Transaction } from "@opensaas/database";
 import type {
   RegistrationContext,
   RegistrationOutcome,
@@ -18,7 +19,7 @@ export type InviteCodeCheck =
        * Consume one use of the code. Called inside the registration
        * transaction after the user exists.
        */
-      consume: (userId: string, tx: unknown) => Promise<void>;
+      consume: (userId: string, tx: Transaction) => Promise<void>;
     }
   | { valid: false; code: string; message: string };
 
