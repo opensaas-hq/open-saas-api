@@ -1,5 +1,6 @@
-import { ValidationError } from "@opensaas/core";
+import { ValidationError, getEnv } from "@opensaas/core";
 
+/** Built-in disposable/temporary email domains, always blocked. */
 const BASE_DISPOSABLE_DOMAINS = [
   "mailinator.com",
   "10minutemail.com",
@@ -12,17 +13,31 @@ const BASE_DISPOSABLE_DOMAINS = [
   "throwawaymail.com",
 ];
 
-export function getDisposableDomains(): Set<string> {
+/**
+ * Parse a comma-separated list of domains, normalized to lowercase and stripped
+ * of blanks. Accepts an already-parsed string or `undefined`.
+ */
+export const parseDomainList = (raw: string | undefined): string[] => {
+  if (!raw || raw.trim() === "") return [];
+  return raw
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase())
+    .filter((domain) => domain.length > 0);
+};
+
+/**
+ * The effective disposable-domain blocklist: the built-ins merged with any
+ * domains configured through `DISPOSABLE_EMAIL_DOMAINS`. The configured value
+ * is read from the **validated** config (`getEnv`), never raw `process.env`, so
+ * there is a single source of truth (§3.6).
+ */
+export function getDisposableDomains(
+  configured: string | undefined = getEnv().DISPOSABLE_EMAIL_DOMAINS,
+): Set<string> {
   const domains = new Set(BASE_DISPOSABLE_DOMAINS);
-
-  const envDomains = process.env.DISPOSABLE_EMAIL_DOMAINS;
-  if (envDomains && envDomains.trim() !== "") {
-    for (const d of envDomains.split(",")) {
-      const clean = d.trim().toLowerCase();
-      if (clean) domains.add(clean);
-    }
+  for (const domain of parseDomainList(configured)) {
+    domains.add(domain);
   }
-
   return domains;
 }
 
@@ -48,12 +63,14 @@ export function normalizeEmail(email: string): string {
   return `${cleanLocal}@${domain}`;
 }
 
-export function isDisposableEmail(email: string): boolean {
+export function isDisposableEmail(
+  email: string,
+  disposableDomains: Set<string> = getDisposableDomains(),
+): boolean {
   const domain = email.trim().toLowerCase().split("@")[1];
   if (!domain) return false;
 
-  const disposableSet = getDisposableDomains();
-  return disposableSet.has(domain);
+  return disposableDomains.has(domain);
 }
 
 export function validateAndNormalizeEmail(email: string): string {
