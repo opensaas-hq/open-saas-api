@@ -1,6 +1,7 @@
 import {
   type AuditEvent,
   type AuditPort,
+  NotFoundError,
   computeAuditDiff,
 } from "@opensaas/core";
 import {
@@ -10,13 +11,17 @@ import {
   type Transaction,
   createContact,
   createContactsBulk,
+  deleteContact,
+  getContactById,
   getContactsByOrganization,
+  updateContact,
   withTransaction,
 } from "@opensaas/database";
 import {
   type ContactDto,
   type CreateContactRequest,
   type PaginationDto,
+  type UpdateContactRequest,
   toContactDto,
 } from "../dto/contacts";
 import type { BranchesService } from "./branches.service";
@@ -51,6 +56,29 @@ export type BulkCreateContactsInput = {
   contacts: CreateContactRequest[];
 };
 
+/** Options of {@link ContactsService.getById}. */
+export type GetContactInput = {
+  organizationId: string;
+  id: string;
+};
+
+/** Options of {@link ContactsService.update}. */
+export type UpdateContactInput = {
+  organizationId: string;
+  /** The user performing the change; recorded in the audit event. */
+  actorId: string;
+  id: string;
+  contact: UpdateContactRequest;
+};
+
+/** Options of {@link ContactsService.remove}. */
+export type RemoveContactInput = {
+  organizationId: string;
+  /** The user performing the change; recorded in the audit event. */
+  actorId: string;
+  id: string;
+};
+
 /** A page of contacts plus its pagination. */
 export type ContactPage = {
   items: ContactDto[];
@@ -61,8 +89,14 @@ export type ContactPage = {
 export type ContactsService = {
   /** List the contacts of one organization. */
   list: (input: ListContactsInput) => Promise<ContactPage>;
+  /** Read one contact of one organization. */
+  getById: (input: GetContactInput) => Promise<ContactDto>;
   /** Create one contact and audit the change. */
   create: (input: CreateContactInput) => Promise<ContactDto>;
+  /** Update one contact and audit the change. */
+  update: (input: UpdateContactInput) => Promise<ContactDto>;
+  /** Delete one contact and audit the change. */
+  remove: (input: RemoveContactInput) => Promise<void>;
   /**
    * Create several contacts in a single transaction and audit every row.
    *
@@ -167,6 +201,101 @@ export const createContactsService = (
     return dto;
   };
 
+  const getById: ContactsService["getById"] = async (input) => {
+    const row = await getContactById({
+      organizationId: input.organizationId,
+      id: input.id,
+      db: deps.db,
+    });
+
+    // A contact of another tenant is reported as missing: the response never
+    // confirms that the id exists somewhere else (§4.3).
+    if (!row) {
+      throw new NotFoundError("Contact not found", {
+        organizationId: input.organizationId,
+        contactId: input.id,
+      });
+    }
+
+    return toContactDto(row);
+  };
+
+  const update: ContactsService["update"] = async (input) => {
+    // The branch of the payload, if any, must belong to the tenant.
+    await assertBranches(input.organizationId, [input.contact.branchId]);
+
+    // The previous state is read first, so the audit event carries the real
+    // diff instead of the whole row.
+    const before = await getById({
+      organizationId: input.organizationId,
+      id: input.id,
+    });
+
+    const row = await updateContact({
+      organizationId: input.organizationId,
+      id: input.id,
+      db: deps.db,
+      name: input.contact.name,
+      phone: input.contact.phone,
+      email: input.contact.email,
+      branchId: input.contact.branchId,
+      status: input.contact.status,
+      optIn: input.contact.optIn,
+      metadata: input.contact.metadata,
+    });
+
+    if (!row) {
+      throw new NotFoundError("Contact not found", {
+        organizationId: input.organizationId,
+        contactId: input.id,
+      });
+    }
+
+    const dto = toContactDto(row);
+
+    await deps.audit.record(
+      contactEvent({
+        action: "contact.updated",
+        organizationId: input.organizationId,
+        actorId: input.actorId,
+        contact: dto,
+        previous: before,
+      }),
+    );
+
+    return dto;
+  };
+
+  const remove: ContactsService["remove"] = async (input) => {
+    const before = await getById({
+      organizationId: input.organizationId,
+      id: input.id,
+    });
+
+    const row = await deleteContact({
+      organizationId: input.organizationId,
+      id: input.id,
+      db: deps.db,
+    });
+
+    if (!row) {
+      throw new NotFoundError("Contact not found", {
+        organizationId: input.organizationId,
+        contactId: input.id,
+      });
+    }
+
+    await deps.audit.record(
+      contactEvent({
+        action: "contact.deleted",
+        organizationId: input.organizationId,
+        actorId: input.actorId,
+        contact: toContactDto(row),
+        previous: before,
+      }),
+    );
+  };
+
   const bulkCreate: ContactsService["bulkCreate"] = async (input) => {
     // A contact without a branch belongs to the branch of the request.
     const contacts = input.contacts.map((contact) => ({
@@ -221,7 +350,7 @@ export const createContactsService = (
     return rows.map(toContactDto);
   };
 
-  return { list, create, bulkCreate };
+  return { list, getById, create, update, remove, bulkCreate };
 };
 
 /** Build the audit event of a contact mutation. */
@@ -230,12 +359,14 @@ const contactEvent = (input: {
   organizationId: string;
   actorId: string;
   contact: ContactDto;
+  /** The state before the mutation, when the event describes a change. */
+  previous?: ContactDto;
 }): AuditEvent => ({
   action: input.action,
   entityType: "contact",
   entityId: input.contact.id,
   actorId: input.actorId,
   organizationId: input.organizationId,
-  changes: computeAuditDiff({}, input.contact),
+  changes: computeAuditDiff(input.previous ?? {}, input.contact),
   timestamp: new Date().toISOString(),
 });

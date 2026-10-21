@@ -1,8 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
 import { ok } from "@opensaas/core";
 import { Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { registerRequestSchema } from "../dto/registration";
 import { validationHook } from "../dto/validation";
+import { hashPayload } from "../services/idempotency.service";
 import type { AppEnv } from "../types";
 
 /**
@@ -26,14 +28,31 @@ registrationRouter.post(
   ),
   async (c) => {
     const body = c.req.valid("json");
+    const services = c.get("services");
 
-    const result = await c.get("services").registration.register({
-      email: body.email,
-      password: body.password,
-      name: body.name,
-      inviteCode: body.inviteCode,
+    // The registration is anonymous: the scope of the key is the identity
+    // being created, so the same key never replays the response of another
+    // identity (§4.9).
+    const result = await services.idempotency.execute({
+      scope: `registration:${hashPayload(body.email)}`,
+      endpoint: "POST /api/registration",
+      key: c.req.header("idempotency-key"),
+      payload: body,
+      operation: async () => ({
+        status: 201,
+        body: await services.registration.register({
+          email: body.email,
+          password: body.password,
+          name: body.name,
+          inviteCode: body.inviteCode,
+        }),
+      }),
     });
 
-    return c.json(ok(result), 201);
+    if (result.replayed) {
+      c.header("idempotent-replayed", "true");
+    }
+
+    return c.json(ok(result.body), result.status as ContentfulStatusCode);
   },
 );

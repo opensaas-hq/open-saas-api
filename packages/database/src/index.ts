@@ -9,6 +9,7 @@ export * from "./repositories/member";
 export * from "./repositories/contact";
 export * from "./repositories/branch";
 export * from "./repositories/audit";
+export * from "./repositories/idempotency";
 export * from "./repositories/like";
 export * from "./repositories/waitlist";
 export * from "./repositories/registration-code";

@@ -12,6 +12,7 @@ import type { AppEnv } from "../types";
  * | Create / update a contact     | yes   | yes   | yes    |
  * | Bulk import contacts          | yes   | yes   | no     |
  * | Delete a contact              | yes   | yes   | no     |
+ * | Read branches                 | yes   | yes   | yes    |
  * | Manage branches               | yes   | yes   | no     |
  * | Manage members and roles      | yes   | no    | no     |
  *
@@ -24,6 +25,7 @@ export const PERMISSION_MATRIX = {
   "contacts:write": ["owner", "admin", "member"],
   "contacts:bulk": ["owner", "admin"],
   "contacts:delete": ["owner", "admin"],
+  "branches:read": ["owner", "admin", "member"],
   "branches:write": ["owner", "admin"],
   "members:write": ["owner"],
 } as const satisfies Record<string, readonly Role[]>;

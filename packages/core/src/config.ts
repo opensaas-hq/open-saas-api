@@ -136,6 +136,10 @@ export const envSchema = z.object({
   // (§4.8), in milliseconds. When it elapses the process exits with a
   // non-zero code instead of waiting forever.
   SHUTDOWN_DRAIN_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+  // How long the response of a write stays replayable (§4.9), in seconds. It
+  // is the TTL of the idempotency keys: after it, the same key runs the
+  // operation again.
+  IDEMPOTENCY_TTL_S: z.coerce.number().int().positive().default(86_400),
   // Write-endpoint rate limiter (§4.5). Better Auth guards its own routes
   // (§3.4); this one guards the project's write endpoints (registration and
   // the CRM writes). `false` disables the limiter.

@@ -44,6 +44,44 @@ export type GetContactsOptions = {
   db?: Database;
 };
 
+/** Options for {@link getContactById}: the tenant is required. */
+export type GetContactByIdOptions = {
+  organizationId: string;
+  id: string;
+  tx?: Transaction;
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  db?: Database;
+};
+
+/** The fields a contact may be updated with. */
+export type ContactUpdate = {
+  name?: string;
+  phone?: string | null;
+  email?: string | null;
+  branchId?: string | null;
+  status?: ContactStatus;
+  optIn?: boolean;
+  metadata?: Record<string, unknown>;
+};
+
+/** Options for {@link updateContact}: the tenant scopes the update. */
+export type UpdateContactOptions = ContactUpdate & {
+  organizationId: string;
+  id: string;
+  tx?: Transaction;
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  db?: Database;
+};
+
+/** Options for {@link deleteContact}: the tenant scopes the delete. */
+export type DeleteContactOptions = {
+  organizationId: string;
+  id: string;
+  tx?: Transaction;
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  db?: Database;
+};
+
 /**
  * List contacts for one organization. `organizationId` is required and always
  * applied in the `WHERE`, so a missing tenant is a type error, not a leak. Runs
@@ -110,6 +148,98 @@ export async function getContactsByOrganization(options: GetContactsOptions) {
       totalPages: Math.ceil(total / limit),
     },
   };
+}
+
+/**
+ * Read one contact of one organization.
+ *
+ * The organization is part of the `WHERE`, so a contact of another tenant is
+ * reported as missing instead of being returned: the lookup cannot be used to
+ * probe another tenant's data. Runs with the tenant GUC set, so RLS confirms
+ * the same scoping (§2.5).
+ */
+export async function getContactById(options: GetContactByIdOptions) {
+  const rows = await runInTenantContext({
+    organizationId: options.organizationId,
+    tx: options.tx,
+    db: options.db,
+    run: async (tx) =>
+      await tx
+        .select()
+        .from(contacts)
+        .where(
+          and(
+            eq(contacts.id, options.id),
+            eq(contacts.organizationId, options.organizationId),
+          ),
+        )
+        .limit(1),
+  });
+
+  return rows[0];
+}
+
+/**
+ * Update a contact, scoped by both id and organization so a caller can never
+ * mutate another tenant's row. Only the fields present in the update are
+ * written, so a partial update never clears the others. Runs with the tenant
+ * GUC set.
+ */
+export async function updateContact(options: UpdateContactOptions) {
+  const changes: Partial<typeof contacts.$inferInsert> = {};
+
+  if (options.name !== undefined) changes.name = options.name;
+  if (options.phone !== undefined) changes.phone = options.phone;
+  if (options.email !== undefined) changes.email = options.email;
+  if (options.branchId !== undefined) changes.branchId = options.branchId;
+  if (options.status !== undefined) changes.status = options.status;
+  if (options.optIn !== undefined) changes.optIn = options.optIn;
+  if (options.metadata !== undefined) changes.metadata = options.metadata;
+
+  return await runInTenantContext({
+    organizationId: options.organizationId,
+    tx: options.tx,
+    db: options.db,
+    run: async (tx) => {
+      const [contact] = await tx
+        .update(contacts)
+        .set(changes)
+        .where(
+          and(
+            eq(contacts.id, options.id),
+            eq(contacts.organizationId, options.organizationId),
+          ),
+        )
+        .returning();
+
+      return contact;
+    },
+  });
+}
+
+/**
+ * Delete a contact, scoped by both id and organization. Returns the deleted
+ * row, or `undefined` when nothing matched. Runs with the tenant GUC set.
+ */
+export async function deleteContact(options: DeleteContactOptions) {
+  return await runInTenantContext({
+    organizationId: options.organizationId,
+    tx: options.tx,
+    db: options.db,
+    run: async (tx) => {
+      const [contact] = await tx
+        .delete(contacts)
+        .where(
+          and(
+            eq(contacts.id, options.id),
+            eq(contacts.organizationId, options.organizationId),
+          ),
+        )
+        .returning();
+
+      return contact;
+    },
+  });
 }
 
 /** Insert a single contact for one organization, with the tenant GUC set. */

@@ -64,6 +64,37 @@ export const contactsQuerySchema = z.object({
   search: z.string().optional(),
 });
 
+/**
+ * Schema of the `:id` path parameter of the contact routes.
+ *
+ * The id is validated before it reaches the service, so a malformed id is a
+ * 422 instead of a database error.
+ */
+export const contactIdParamSchema = z.object({
+  id: z.uuid("The contact id must be a uuid"),
+});
+
+/**
+ * Request schema for updating a contact.
+ *
+ * Every field is optional: only the fields present in the request are
+ * written, so a partial update never clears the others. The tenant, the
+ * actor and the timestamps are never part of the request.
+ */
+export const updateContactRequestSchema = z
+  .object({
+    name: z.string().min(1, "Name is required").optional(),
+    phone: z.string().nullable().optional(),
+    email: z.email().nullable().optional(),
+    branchId: z.uuid().nullable().optional(),
+    status: z.enum(["active", "lead", "churned"]).optional(),
+    optIn: z.boolean().optional(),
+    metadata: metadataSchema.optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one field must be provided",
+  });
+
 /** A contact as the API returns it. */
 export type ContactDto = {
   id: string;
@@ -96,6 +127,12 @@ export type CreateContactRequest = z.input<typeof createContactRequestSchema>;
 export type ParsedCreateContactRequest = z.output<
   typeof createContactRequestSchema
 >;
+
+/**
+ * An update-contact request, as received: every field is optional, so the
+ * service decides which fields the request actually changes.
+ */
+export type UpdateContactRequest = z.input<typeof updateContactRequestSchema>;
 
 /**
  * Map a contact row to its API representation.

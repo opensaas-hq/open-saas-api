@@ -6,6 +6,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -327,5 +328,47 @@ export const auditLog = pgTable(
       table.entityType,
       table.entityId,
     ),
+  ],
+);
+
+/**
+ * Idempotency keys of the write endpoints (§4.9).
+ *
+ * A client sends an `Idempotency-Key` header with a write. The key, the hash
+ * of the request payload and the response are stored here, so a replay
+ * returns the original response instead of writing the row twice.
+ *
+ * The key is scoped by `scope` (the tenant, or the identity of an anonymous
+ * flow) and by `endpoint`: the same key may be reused on another endpoint
+ * without a false conflict, while the same key with a different payload on
+ * the same endpoint is reported as a conflict.
+ *
+ * The table is internal: no route ever returns it, and the API never exposes
+ * the stored response of another scope.
+ */
+export const idempotencyKeys = pgTable(
+  "idempotency_keys",
+  {
+    scope: text("scope").notNull(),
+    endpoint: text("endpoint").notNull(),
+    key: text("key").notNull(),
+    /** Hash of the canonical request payload, used to detect a different body. */
+    requestHash: text("request_hash").notNull(),
+    /**
+     * Status of the stored response. It is `null` while the first request is
+     * still in flight, which is how a concurrent replay knows to wait.
+     */
+    responseStatus: integer("response_status"),
+    /** The original response body, replayed to a repeated request. */
+    responseBody: jsonb("response_body"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    /** When the entry expires: a later request with the same key runs again. */
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.scope, table.endpoint, table.key] }),
+    index("idempotency_keys_expires_at_idx").on(table.expiresAt),
   ],
 );

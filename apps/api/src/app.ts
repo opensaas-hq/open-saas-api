@@ -18,11 +18,13 @@ import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { type Lifecycle, createLifecycle } from "./lifecycle";
 import { createPipeline } from "./middleware/pipeline";
+import { createBranchesRouter } from "./routes/branches";
 import { createContactsRouter } from "./routes/contacts";
 import { type BreakerProbe, createHealthRouter } from "./routes/health";
 import { registrationRouter } from "./routes/registration";
 import { createBranchesService } from "./services/branches.service";
 import { createContactsService } from "./services/contacts.service";
+import { createIdempotencyService } from "./services/idempotency.service";
 import { createMembershipService } from "./services/membership.service";
 import { createRegistrationService } from "./services/registration.service";
 import type { AppEnv } from "./types";
@@ -76,7 +78,7 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnv> => {
   // port is the database-backed implementation, shared by every service that
   // mutates state (§4.4).
   const audit = new DatabaseAuditRepository(undefined, db);
-  const branches = createBranchesService({ db });
+  const branches = createBranchesService({ db, audit });
   const services = {
     membership: createMembershipService({
       ttlSeconds: env.MEMBERSHIP_CACHE_TTL_S,
@@ -86,6 +88,10 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnv> => {
     branches,
     contacts: createContactsService({ branches, audit, db }),
     registration: createRegistrationService({ env, audit, db }),
+    idempotency: createIdempotencyService({
+      ttlSeconds: env.IDEMPOTENCY_TTL_S,
+      db,
+    }),
   };
 
   // Dependency-injection slots (§4.7): expose the validated config, the
@@ -137,6 +143,7 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnv> => {
     "/api/contacts",
     createContactsRouter({ bulkMaxContacts: env.BULK_MAX_CONTACTS }),
   );
+  app.route("/api/branches", createBranchesRouter());
 
   // Unknown routes still answer with the JSON envelope instead of Hono's
   // plain-text default, keeping the response contract intact.

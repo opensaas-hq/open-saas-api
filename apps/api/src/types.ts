@@ -3,6 +3,7 @@ import type { Env, Logger } from "@opensaas/core";
 import type { Database } from "@opensaas/database";
 import type { BranchesService } from "./services/branches.service";
 import type { ContactsService } from "./services/contacts.service";
+import type { IdempotencyService } from "./services/idempotency.service";
 import type { MembershipService, Role } from "./services/membership.service";
 import type { RegistrationService } from "./services/registration.service";
 
@@ -34,12 +35,14 @@ export type TenantContext = {
 export type AppServices = {
   /** Membership lookups and role changes (§4.3). */
   membership: MembershipService;
-  /** Branch ownership rules (§4.3). */
+  /** Branch ownership rules and branch mutations (§4.3, §4.9). */
   branches: BranchesService;
   /** Contacts: reads, writes, transactions and auditing (§4.4). */
   contacts: ContactsService;
   /** Registration flow and its audit event (§4.4). */
   registration: RegistrationService;
+  /** Replay rules of the write endpoints (§4.9). */
+  idempotency: IdempotencyService;
 };
 
 /**

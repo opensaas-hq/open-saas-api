@@ -1,10 +1,14 @@
 import { zValidator } from "@hono/zod-validator";
 import { ok } from "@opensaas/core";
 import { Hono } from "hono";
+import { etag } from "hono/etag";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import {
+  contactIdParamSchema,
   contactsQuerySchema,
   createBulkContactsRequestSchema,
   createContactRequestSchema,
+  updateContactRequestSchema,
 } from "../dto/contacts";
 import { validationHook } from "../dto/validation";
 import { requirePermission } from "../middleware/rbac";
@@ -42,8 +46,13 @@ export const createContactsRouter = (
   contactsRouter.use("*", tenantContextMiddleware);
 
   // GET /api/contacts
+  //
+  // The listing is cacheable: the response carries an ETag, so a client that
+  // already holds the list can revalidate it with `If-None-Match` and get a
+  // 304 without the body (§4.9).
   contactsRouter.get(
     "/",
+    etag(),
     zValidator(
       "query",
       contactsQuerySchema,
@@ -62,7 +71,33 @@ export const createContactsRouter = (
     },
   );
 
+  // GET /api/contacts/:id
+  contactsRouter.get(
+    "/:id",
+    requirePermission("contacts:read"),
+    zValidator(
+      "param",
+      contactIdParamSchema,
+      validationHook("Invalid contact id"),
+    ),
+    async (c) => {
+      const tenant = c.get("tenant");
+      const { id } = c.req.valid("param");
+
+      const contact = await c.get("services").contacts.getById({
+        organizationId: tenant.organizationId,
+        id,
+      });
+
+      return c.json(ok(contact));
+    },
+  );
+
   // POST /api/contacts
+  //
+  // The write accepts an `Idempotency-Key`: a retry of the same request
+  // replays the original response instead of creating a second contact
+  // (§4.9).
   contactsRouter.post(
     "/",
     zValidator(
@@ -74,15 +109,92 @@ export const createContactsRouter = (
       const tenant = c.get("tenant");
       const user = c.get("user");
       const body = c.req.valid("json");
+      const services = c.get("services");
 
-      const contact = await c.get("services").contacts.create({
+      const result = await services.idempotency.execute({
+        scope: `organization:${tenant.organizationId}`,
+        endpoint: "POST /api/contacts",
+        key: c.req.header("idempotency-key"),
+        payload: {
+          body,
+          // The branch of the request is part of the request: the same key
+          // with another branch is another request, not a replay.
+          branchId: body.branchId ?? tenant.branchId ?? null,
+        },
+        operation: async () => ({
+          status: 201,
+          body: await services.contacts.create({
+            organizationId: tenant.organizationId,
+            actorId: user.id,
+            branchId: tenant.branchId,
+            contact: body,
+          }),
+        }),
+      });
+
+      if (result.replayed) {
+        c.header("idempotent-replayed", "true");
+      }
+
+      return c.json(ok(result.body), result.status as ContentfulStatusCode);
+    },
+  );
+
+  // PATCH /api/contacts/:id
+  contactsRouter.patch(
+    "/:id",
+    requirePermission("contacts:write"),
+    zValidator(
+      "param",
+      contactIdParamSchema,
+      validationHook("Invalid contact id"),
+    ),
+    zValidator(
+      "json",
+      updateContactRequestSchema,
+      validationHook("Invalid contact data"),
+    ),
+    async (c) => {
+      const tenant = c.get("tenant");
+      const user = c.get("user");
+      const { id } = c.req.valid("param");
+      const body = c.req.valid("json");
+
+      const contact = await c.get("services").contacts.update({
         organizationId: tenant.organizationId,
         actorId: user.id,
-        branchId: tenant.branchId,
+        id,
         contact: body,
       });
 
-      return c.json(ok(contact), 201);
+      return c.json(ok(contact));
+    },
+  );
+
+  // DELETE /api/contacts/:id
+  //
+  // Deleting a contact is reserved to the roles that can change a whole
+  // tenant's dataset at once (§4.3 permission matrix).
+  contactsRouter.delete(
+    "/:id",
+    requirePermission("contacts:delete"),
+    zValidator(
+      "param",
+      contactIdParamSchema,
+      validationHook("Invalid contact id"),
+    ),
+    async (c) => {
+      const tenant = c.get("tenant");
+      const user = c.get("user");
+      const { id } = c.req.valid("param");
+
+      await c.get("services").contacts.remove({
+        organizationId: tenant.organizationId,
+        actorId: user.id,
+        id,
+      });
+
+      return c.json(ok({ id }));
     },
   );
 
@@ -102,15 +214,32 @@ export const createContactsRouter = (
       const tenant = c.get("tenant");
       const user = c.get("user");
       const body = c.req.valid("json");
+      const services = c.get("services");
 
-      const contacts = await c.get("services").contacts.bulkCreate({
-        organizationId: tenant.organizationId,
-        actorId: user.id,
-        branchId: tenant.branchId,
-        contacts: body.contacts,
+      const result = await services.idempotency.execute({
+        scope: `organization:${tenant.organizationId}`,
+        endpoint: "POST /api/contacts/bulk",
+        key: c.req.header("idempotency-key"),
+        payload: { body, branchId: tenant.branchId ?? null },
+        operation: async () => ({
+          status: 201,
+          body: await services.contacts.bulkCreate({
+            organizationId: tenant.organizationId,
+            actorId: user.id,
+            branchId: tenant.branchId,
+            contacts: body.contacts,
+          }),
+        }),
       });
 
-      return c.json(ok({ count: contacts.length, contacts }), 201);
+      if (result.replayed) {
+        c.header("idempotent-replayed", "true");
+      }
+
+      return c.json(
+        ok({ count: result.body.length, contacts: result.body }),
+        result.status as ContentfulStatusCode,
+      );
     },
   );
 
