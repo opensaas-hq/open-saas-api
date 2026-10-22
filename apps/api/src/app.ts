@@ -17,8 +17,11 @@ import {
 } from "@opensaas/database";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { createGraphqlContext } from "./graphql/context";
+import { createGraphqlEndpoint } from "./graphql/yoga";
 import { type Lifecycle, createLifecycle } from "./lifecycle";
 import { createPipeline } from "./middleware/pipeline";
+import { tenantContextMiddleware } from "./middleware/tenant";
 import { buildOpenApiDocument } from "./openapi/document";
 import { createLegacyDeprecationMiddleware } from "./openapi/legacy";
 import {
@@ -33,6 +36,7 @@ import { createBranchesService } from "./services/branches.service";
 import { createContactsService } from "./services/contacts.service";
 import { createIdempotencyService } from "./services/idempotency.service";
 import { createMembershipService } from "./services/membership.service";
+import { createOrganizationsService } from "./services/organizations.service";
 import { createRegistrationService } from "./services/registration.service";
 import type { AppEnv } from "./types";
 
@@ -101,6 +105,7 @@ export const createApp = (
       db,
     }),
     branches,
+    organizations: createOrganizationsService({ db }),
     contacts: createContactsService({ branches, audit, db }),
     registration: createRegistrationService({ env, audit, db }),
     idempotency: createIdempotencyService({
@@ -155,6 +160,16 @@ export const createApp = (
       lifecycle,
       logger,
     }),
+  );
+
+  // The GraphQL surface (§4.11): one endpoint over the CRM domain, behind the
+  // same pipeline and the same tenant resolution as REST. The session, the
+  // tenant and the branch are resolved before a resolver runs, and every
+  // resolver delegates to the service layer.
+  const graphql = createGraphqlEndpoint({ env });
+
+  app.on(["GET", "POST"], "/graphql", tenantContextMiddleware, (c) =>
+    graphql.fetch(c.req.raw, createGraphqlContext(c)),
   );
 
   // The versioned product surface (§4.10). These are the paths the OpenAPI

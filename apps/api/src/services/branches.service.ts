@@ -33,6 +33,11 @@ export type BranchesService = {
     organizationId: string;
     branchId: string;
   }) => Promise<void>;
+  /** Read one branch of one organization. */
+  getById: (input: {
+    organizationId: string;
+    id: string;
+  }) => Promise<BranchDto>;
   /** List the branches of one organization. */
   list: (input: { organizationId: string }) => Promise<BranchDto[]>;
   /** Create a branch and audit the change. */
@@ -103,6 +108,25 @@ export const createBranchesService = (
         });
       }
     };
+
+  const getById: BranchesService["getById"] = async (input) => {
+    const row = await getBranchById({
+      organizationId: input.organizationId,
+      id: input.id,
+      db: deps.db,
+    });
+
+    // A branch of another tenant is reported as missing: the response never
+    // confirms that the id exists somewhere else (§4.3).
+    if (!row) {
+      throw new NotFoundError("Branch not found", {
+        organizationId: input.organizationId,
+        branchId: input.id,
+      });
+    }
+
+    return toBranchDto(row);
+  };
 
   const list: BranchesService["list"] = async (input) => {
     const rows = await listBranches({
@@ -219,6 +243,7 @@ export const createBranchesService = (
 
   return {
     assertBelongsToOrganization,
+    getById,
     list,
     create,
     update,

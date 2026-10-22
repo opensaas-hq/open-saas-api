@@ -146,6 +146,18 @@ export const envSchema = z.object({
   WRITE_RATE_LIMIT_ENABLED: booleanFlag.default(true),
   WRITE_RATE_LIMIT_WINDOW_S: z.coerce.number().int().positive().default(60),
   WRITE_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(30),
+  // GraphQL safety limits (§4.11). The depth is the maximum nesting of a
+  // selection set; the cost is the number of fields a document selects once
+  // its fragments are expanded. Both are checked before execution, so a
+  // pathological document is refused instead of resolved.
+  GRAPHQL_MAX_DEPTH: z.coerce.number().int().positive().default(10),
+  GRAPHQL_MAX_COMPLEXITY: z.coerce.number().int().positive().default(500),
+  // Schema introspection (§4.11). Unset enables it outside production only;
+  // an explicit `true`/`false` overrides that default.
+  GRAPHQL_INTROSPECTION_ENABLED: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    booleanFlag.optional(),
+  ),
   // An empty string (e.g. an unset `.env` entry) falls back to the default
   // instead of being treated as an invalid value.
   REGISTRATION_MODE: z.preprocess(

@@ -1,4 +1,5 @@
-import { type Transaction, db } from "../client";
+import { eq } from "drizzle-orm";
+import { type Database, type Transaction, db } from "../client";
 import { organization } from "../schema";
 
 export interface CreateOrganizationInput {
@@ -30,4 +31,30 @@ export async function createOrganization(input: CreateOrganizationInput) {
     })
     .returning();
   return newOrg;
+}
+
+/** Options for {@link getOrganizationById}. */
+export type GetOrganizationByIdOptions = {
+  id: string;
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  db?: Database;
+};
+
+/**
+ * Read one organization by id.
+ *
+ * The `organization` table is a framework table outside the RLS scope (§2.5),
+ * so no tenant GUC is set; callers still pass the organization id resolved
+ * from the session, never one taken from the request.
+ */
+export async function getOrganizationById(options: GetOrganizationByIdOptions) {
+  const executor = options.db ?? db;
+
+  const rows = await executor
+    .select()
+    .from(organization)
+    .where(eq(organization.id, options.id))
+    .limit(1);
+
+  return rows[0];
 }

@@ -5,6 +5,7 @@ import type { BranchesService } from "./services/branches.service";
 import type { ContactsService } from "./services/contacts.service";
 import type { IdempotencyService } from "./services/idempotency.service";
 import type { MembershipService, Role } from "./services/membership.service";
+import type { OrganizationsService } from "./services/organizations.service";
 import type { RegistrationService } from "./services/registration.service";
 
 /**
@@ -39,6 +40,8 @@ export type AppServices = {
   branches: BranchesService;
   /** Contacts: reads, writes, transactions and auditing (§4.4). */
   contacts: ContactsService;
+  /** Organization reads of the active tenant (§4.11). */
+  organizations: OrganizationsService;
   /** Registration flow and its audit event (§4.4). */
   registration: RegistrationService;
   /** Replay rules of the write endpoints (§4.9). */
