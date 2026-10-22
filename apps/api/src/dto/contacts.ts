@@ -95,19 +95,28 @@ export const updateContactRequestSchema = z
     message: "At least one field must be provided",
   });
 
+/**
+ * Zod schema of a contact as the API returns it.
+ *
+ * The schema is the single source of the wire format: the TypeScript type is
+ * inferred from it, and the generated OpenAPI document describes the same
+ * shape, so the three cannot drift (§4.10).
+ */
+export const contactDtoSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
+  branchId: z.string().nullable(),
+  status: z.enum(["active", "lead", "churned"]),
+  optIn: z.boolean(),
+  metadata: z.record(z.string(), z.unknown()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 /** A contact as the API returns it. */
-export type ContactDto = {
-  id: string;
-  name: string;
-  phone: string | null;
-  email: string | null;
-  branchId: string | null;
-  status: "active" | "lead" | "churned";
-  optIn: boolean;
-  metadata: Record<string, unknown>;
-  createdAt: string;
-  updatedAt: string;
-};
+export type ContactDto = z.infer<typeof contactDtoSchema>;
 
 /** Pagination of a list response. */
 export type PaginationDto = {

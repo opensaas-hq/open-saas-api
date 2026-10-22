@@ -41,7 +41,7 @@ describeIfDb("Apps/API - Idempotency keys (§4.9)", () => {
     await close();
   });
 
-  test("a replay of POST /api/contacts returns the original response and writes no second contact", async () => {
+  test("a replay of POST /api/v1/contacts returns the original response and writes no second contact", async () => {
     const { app } = createAppWithoutCache();
     const tenant = await createTenant(app, {
       email: "idem@example.com",
@@ -52,7 +52,7 @@ describeIfDb("Apps/API - Idempotency keys (§4.9)", () => {
 
     const post = async () =>
       await app.fetch(
-        new Request(`${APP_ORIGIN}/api/contacts`, {
+        new Request(`${APP_ORIGIN}/api/v1/contacts`, {
           method: "POST",
           headers: {
             ...jsonHeaders(tenant.cookie),
@@ -90,7 +90,7 @@ describeIfDb("Apps/API - Idempotency keys (§4.9)", () => {
 
     const post = async () =>
       await app.fetch(
-        new Request(`${APP_ORIGIN}/api/contacts`, {
+        new Request(`${APP_ORIGIN}/api/v1/contacts`, {
           method: "POST",
           headers: {
             ...jsonHeaders(tenant.cookie),
@@ -127,7 +127,7 @@ describeIfDb("Apps/API - Idempotency keys (§4.9)", () => {
 
     const post = async (name: string) =>
       await app.fetch(
-        new Request(`${APP_ORIGIN}/api/contacts`, {
+        new Request(`${APP_ORIGIN}/api/v1/contacts`, {
           method: "POST",
           headers: {
             ...jsonHeaders(tenant.cookie),
@@ -159,7 +159,7 @@ describeIfDb("Apps/API - Idempotency keys (§4.9)", () => {
 
     const post = async () =>
       await app.fetch(
-        new Request(`${APP_ORIGIN}/api/contacts`, {
+        new Request(`${APP_ORIGIN}/api/v1/contacts`, {
           method: "POST",
           headers: jsonHeaders(tenant.cookie),
           body: JSON.stringify({ name: "Twice" }),
@@ -190,7 +190,7 @@ describeIfDb("Apps/API - Idempotency keys (§4.9)", () => {
 
     const post = async (cookie: string, name: string) =>
       await app.fetch(
-        new Request(`${APP_ORIGIN}/api/contacts`, {
+        new Request(`${APP_ORIGIN}/api/v1/contacts`, {
           method: "POST",
           headers: { ...jsonHeaders(cookie), "idempotency-key": "shared-key" },
           body: JSON.stringify({ name }),
@@ -210,7 +210,7 @@ describeIfDb("Apps/API - Idempotency keys (§4.9)", () => {
 
     const register = async () =>
       await app.fetch(
-        new Request(`${APP_ORIGIN}/api/registration`, {
+        new Request(`${APP_ORIGIN}/api/v1/registration`, {
           method: "POST",
           headers: {
             "content-type": "application/json",

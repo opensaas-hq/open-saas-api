@@ -116,13 +116,10 @@ export const createHealthRouter = (
 
   router.get("/readyz", readiness);
 
-  // The historical endpoint: same semantics as the readiness, marked as
-  // deprecated so the callers migrate to `/readyz`.
-  router.get("/api/health", async (c) => {
-    c.header("deprecation", "true");
-    c.header("link", '</readyz>; rel="successor-version"');
-    return await readiness(c);
-  });
+  // The historical endpoint: same semantics as the readiness. It is marked as
+  // deprecated by the deprecation middleware of the application (§4.10), the
+  // same way the other legacy paths are.
+  router.get("/api/health", async (c) => await readiness(c));
 
   return router;
 };

@@ -1,9 +1,9 @@
-import { zValidator } from "@hono/zod-validator";
-import { ok } from "@opensaas/core";
-import { Hono } from "hono";
+import { OpenAPIHono, createRoute } from "@hono/zod-openapi";
+import { apiSuccessResponseSchema, ok } from "@opensaas/core";
 import { etag } from "hono/etag";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { z } from "zod";
 import {
+  contactDtoSchema,
   contactIdParamSchema,
   contactsQuerySchema,
   createBulkContactsRequestSchema,
@@ -13,6 +13,15 @@ import {
 import { validationHook } from "../dto/validation";
 import { requirePermission } from "../middleware/rbac";
 import { tenantContextMiddleware } from "../middleware/tenant";
+import {
+  conflictResponse,
+  forbiddenResponse,
+  internalErrorResponse,
+  notFoundResponse,
+  rateLimitResponse,
+  unauthorizedResponse,
+  validationResponse,
+} from "../openapi/responses";
 import type { AppEnv } from "../types";
 
 /**
@@ -22,6 +31,15 @@ export type ContactsRouterOptions = {
   /** Maximum number of contacts accepted in one bulk import (§4.5). */
   bulkMaxContacts: number;
 };
+
+/** The body of a bulk import: how many contacts were created, and which. */
+const bulkContactsResultSchema = z.object({
+  count: z.number().int().nonnegative(),
+  contacts: z.array(contactDtoSchema),
+});
+
+/** The body of a deletion: the identifier of the removed resource. */
+const deletedContactSchema = z.object({ id: z.uuid() });
 
 /**
  * Build the contacts surface.
@@ -33,11 +51,14 @@ export type ContactsRouterOptions = {
  * The router is built per application because the bulk limit is a deployment
  * knob (§4.5): the schema carries the configured maximum, so an oversized
  * batch is refused before any transaction is started.
+ *
+ * Every route is declared with `createRoute`, so the request schemas and the
+ * documented responses are the very same objects the runtime uses (§4.10).
  */
 export const createContactsRouter = (
   options: ContactsRouterOptions,
-): Hono<AppEnv> => {
-  const contactsRouter = new Hono<AppEnv>();
+): OpenAPIHono<AppEnv> => {
+  const contactsRouter = new OpenAPIHono<AppEnv>();
 
   const bulkContactsRequestSchema = createBulkContactsRequestSchema(
     options.bulkMaxContacts,
@@ -45,19 +66,35 @@ export const createContactsRouter = (
 
   contactsRouter.use("*", tenantContextMiddleware);
 
-  // GET /api/contacts
+  // GET /api/v1/contacts
   //
   // The listing is cacheable: the response carries an ETag, so a client that
   // already holds the list can revalidate it with `If-None-Match` and get a
   // 304 without the body (§4.9).
-  contactsRouter.get(
-    "/",
-    etag(),
-    zValidator(
-      "query",
-      contactsQuerySchema,
-      validationHook("Invalid contact query parameters"),
-    ),
+  const listContactsRoute = createRoute({
+    method: "get",
+    path: "/",
+    middleware: [etag()],
+    request: {
+      query: contactsQuerySchema,
+    },
+    responses: {
+      200: {
+        description: "The contacts of the tenant",
+        content: {
+          "application/json": {
+            schema: apiSuccessResponseSchema(z.array(contactDtoSchema), true),
+          },
+        },
+      },
+      401: unauthorizedResponse,
+      422: validationResponse,
+      500: internalErrorResponse,
+    },
+  });
+
+  contactsRouter.openapi(
+    listContactsRoute,
     async (c) => {
       const tenant = c.get("tenant");
       const query = c.req.valid("query");
@@ -67,19 +104,38 @@ export const createContactsRouter = (
         ...query,
       });
 
-      return c.json(ok(result.items, result.pagination));
+      return c.json(ok(result.items, result.pagination), 200);
     },
+    validationHook("Invalid contact query parameters"),
   );
 
-  // GET /api/contacts/:id
-  contactsRouter.get(
-    "/:id",
-    requirePermission("contacts:read"),
-    zValidator(
-      "param",
-      contactIdParamSchema,
-      validationHook("Invalid contact id"),
-    ),
+  // GET /api/v1/contacts/:id
+  const getContactRoute = createRoute({
+    method: "get",
+    path: "/{id}",
+    middleware: [requirePermission("contacts:read")],
+    request: {
+      params: contactIdParamSchema,
+    },
+    responses: {
+      200: {
+        description: "The requested contact",
+        content: {
+          "application/json": {
+            schema: apiSuccessResponseSchema(contactDtoSchema),
+          },
+        },
+      },
+      401: unauthorizedResponse,
+      403: forbiddenResponse,
+      404: notFoundResponse,
+      422: validationResponse,
+      500: internalErrorResponse,
+    },
+  });
+
+  contactsRouter.openapi(
+    getContactRoute,
     async (c) => {
       const tenant = c.get("tenant");
       const { id } = c.req.valid("param");
@@ -89,22 +145,48 @@ export const createContactsRouter = (
         id,
       });
 
-      return c.json(ok(contact));
+      return c.json(ok(contact), 200);
     },
+    validationHook("Invalid contact id"),
   );
 
-  // POST /api/contacts
+  // POST /api/v1/contacts
   //
   // The write accepts an `Idempotency-Key`: a retry of the same request
   // replays the original response instead of creating a second contact
   // (§4.9).
-  contactsRouter.post(
-    "/",
-    zValidator(
-      "json",
-      createContactRequestSchema,
-      validationHook("Invalid contact data"),
-    ),
+  const createContactRoute = createRoute({
+    method: "post",
+    path: "/",
+    request: {
+      body: {
+        content: { "application/json": { schema: createContactRequestSchema } },
+        required: true,
+      },
+      headers: z.object({
+        "idempotency-key": z.string().min(1).optional(),
+      }),
+    },
+    responses: {
+      201: {
+        description: "The created contact",
+        content: {
+          "application/json": {
+            schema: apiSuccessResponseSchema(contactDtoSchema),
+          },
+        },
+      },
+      401: unauthorizedResponse,
+      403: forbiddenResponse,
+      409: conflictResponse,
+      422: validationResponse,
+      429: rateLimitResponse,
+      500: internalErrorResponse,
+    },
+  });
+
+  contactsRouter.openapi(
+    createContactRoute,
     async (c) => {
       const tenant = c.get("tenant");
       const user = c.get("user");
@@ -113,7 +195,7 @@ export const createContactsRouter = (
 
       const result = await services.idempotency.execute({
         scope: `organization:${tenant.organizationId}`,
-        endpoint: "POST /api/contacts",
+        endpoint: "POST /api/v1/contacts",
         key: c.req.header("idempotency-key"),
         payload: {
           body,
@@ -136,24 +218,46 @@ export const createContactsRouter = (
         c.header("idempotent-replayed", "true");
       }
 
-      return c.json(ok(result.body), result.status as ContentfulStatusCode);
+      // The operation always answers 201: the replay returns the stored body
+      // of that very response.
+      return c.json(ok(result.body), 201);
     },
+    validationHook("Invalid contact data"),
   );
 
-  // PATCH /api/contacts/:id
-  contactsRouter.patch(
-    "/:id",
-    requirePermission("contacts:write"),
-    zValidator(
-      "param",
-      contactIdParamSchema,
-      validationHook("Invalid contact id"),
-    ),
-    zValidator(
-      "json",
-      updateContactRequestSchema,
-      validationHook("Invalid contact data"),
-    ),
+  // PATCH /api/v1/contacts/:id
+  const updateContactRoute = createRoute({
+    method: "patch",
+    path: "/{id}",
+    middleware: [requirePermission("contacts:write")],
+    request: {
+      params: contactIdParamSchema,
+      body: {
+        content: {
+          "application/json": { schema: updateContactRequestSchema },
+        },
+        required: true,
+      },
+    },
+    responses: {
+      200: {
+        description: "The updated contact",
+        content: {
+          "application/json": {
+            schema: apiSuccessResponseSchema(contactDtoSchema),
+          },
+        },
+      },
+      401: unauthorizedResponse,
+      403: forbiddenResponse,
+      404: notFoundResponse,
+      422: validationResponse,
+      500: internalErrorResponse,
+    },
+  });
+
+  contactsRouter.openapi(
+    updateContactRoute,
     async (c) => {
       const tenant = c.get("tenant");
       const user = c.get("user");
@@ -167,22 +271,41 @@ export const createContactsRouter = (
         contact: body,
       });
 
-      return c.json(ok(contact));
+      return c.json(ok(contact), 200);
     },
+    validationHook("Invalid contact data"),
   );
 
-  // DELETE /api/contacts/:id
+  // DELETE /api/v1/contacts/:id
   //
   // Deleting a contact is reserved to the roles that can change a whole
   // tenant's dataset at once (§4.3 permission matrix).
-  contactsRouter.delete(
-    "/:id",
-    requirePermission("contacts:delete"),
-    zValidator(
-      "param",
-      contactIdParamSchema,
-      validationHook("Invalid contact id"),
-    ),
+  const deleteContactRoute = createRoute({
+    method: "delete",
+    path: "/{id}",
+    middleware: [requirePermission("contacts:delete")],
+    request: {
+      params: contactIdParamSchema,
+    },
+    responses: {
+      200: {
+        description: "The deleted contact",
+        content: {
+          "application/json": {
+            schema: apiSuccessResponseSchema(deletedContactSchema),
+          },
+        },
+      },
+      401: unauthorizedResponse,
+      403: forbiddenResponse,
+      404: notFoundResponse,
+      422: validationResponse,
+      500: internalErrorResponse,
+    },
+  });
+
+  contactsRouter.openapi(
+    deleteContactRoute,
     async (c) => {
       const tenant = c.get("tenant");
       const user = c.get("user");
@@ -194,22 +317,50 @@ export const createContactsRouter = (
         id,
       });
 
-      return c.json(ok({ id }));
+      return c.json(ok({ id }), 200);
     },
+    validationHook("Invalid contact id"),
   );
 
-  // POST /api/contacts/bulk
+  // POST /api/v1/contacts/bulk
   //
   // Bulk import is reserved to the roles that can change a whole tenant's
   // dataset at once (§4.3 permission matrix).
-  contactsRouter.post(
-    "/bulk",
-    requirePermission("contacts:bulk"),
-    zValidator(
-      "json",
-      bulkContactsRequestSchema,
-      validationHook("Invalid bulk contacts data"),
-    ),
+  const bulkCreateContactsRoute = createRoute({
+    method: "post",
+    path: "/bulk",
+    middleware: [requirePermission("contacts:bulk")],
+    request: {
+      body: {
+        content: {
+          "application/json": { schema: bulkContactsRequestSchema },
+        },
+        required: true,
+      },
+      headers: z.object({
+        "idempotency-key": z.string().min(1).optional(),
+      }),
+    },
+    responses: {
+      201: {
+        description: "The created contacts",
+        content: {
+          "application/json": {
+            schema: apiSuccessResponseSchema(bulkContactsResultSchema),
+          },
+        },
+      },
+      401: unauthorizedResponse,
+      403: forbiddenResponse,
+      409: conflictResponse,
+      422: validationResponse,
+      429: rateLimitResponse,
+      500: internalErrorResponse,
+    },
+  });
+
+  contactsRouter.openapi(
+    bulkCreateContactsRoute,
     async (c) => {
       const tenant = c.get("tenant");
       const user = c.get("user");
@@ -218,7 +369,7 @@ export const createContactsRouter = (
 
       const result = await services.idempotency.execute({
         scope: `organization:${tenant.organizationId}`,
-        endpoint: "POST /api/contacts/bulk",
+        endpoint: "POST /api/v1/contacts/bulk",
         key: c.req.header("idempotency-key"),
         payload: { body, branchId: tenant.branchId ?? null },
         operation: async () => ({
@@ -238,9 +389,10 @@ export const createContactsRouter = (
 
       return c.json(
         ok({ count: result.body.length, contacts: result.body }),
-        result.status as ContentfulStatusCode,
+        201,
       );
     },
+    validationHook("Invalid bulk contacts data"),
   );
 
   return contactsRouter;

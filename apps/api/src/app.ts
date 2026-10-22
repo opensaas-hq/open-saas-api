@@ -1,3 +1,4 @@
+import { OpenAPIHono } from "@hono/zod-openapi";
 import type { AuthInstance } from "@opensaas/auth";
 import {
   AppError,
@@ -18,6 +19,12 @@ import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { type Lifecycle, createLifecycle } from "./lifecycle";
 import { createPipeline } from "./middleware/pipeline";
+import { buildOpenApiDocument } from "./openapi/document";
+import { createLegacyDeprecationMiddleware } from "./openapi/legacy";
+import {
+  swaggerUiContentSecurityPolicy,
+  swaggerUiHtml,
+} from "./openapi/swagger";
 import { createBranchesRouter } from "./routes/branches";
 import { createContactsRouter } from "./routes/contacts";
 import { type BreakerProbe, createHealthRouter } from "./routes/health";
@@ -64,14 +71,22 @@ export type AppDependencies = {
  * The Better Auth handler is mounted on the whole `/api/auth/*` surface before
  * any custom route (§4.1), so the framework owns sign-up, sign-in, sign-out,
  * session and organization endpoints. The project-owned registration endpoint
- * lives outside that surface (`/api/registration`), which removes any possible
- * shadowing between the two.
+ * lives outside that surface (`/api/v1/registration`), which removes any
+ * possible shadowing between the two.
+ *
+ * The product routes live under `/api/v1` (§4.10): the versioned prefix is
+ * the contract, published as an OpenAPI 3.1 document at
+ * `/api/v1/openapi.json` and rendered by the Swagger UI at `/api/v1/docs`.
+ * The historical paths keep working as deprecated aliases: they answer with
+ * the `Deprecation` and `Sunset` headers.
  */
-export const createApp = (dependencies: AppDependencies): Hono<AppEnv> => {
+export const createApp = (
+  dependencies: AppDependencies,
+): OpenAPIHono<AppEnv> => {
   const { env, db, auth, logger } = dependencies;
   const lifecycle = dependencies.lifecycle ?? createLifecycle();
   const breaker = dependencies.breaker ?? getBreaker();
-  const app = new Hono<AppEnv>();
+  const app = new OpenAPIHono<AppEnv>();
 
   // The services are built once per app: the membership cache must survive
   // across requests, so it cannot be created per request (§4.3). The audit
@@ -116,6 +131,10 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnv> => {
     app.use("*", middleware);
   }
 
+  // The deprecated paths are marked before any route is matched: the headers
+  // belong to every response of those paths, successful or not (§4.10).
+  app.use("*", createLegacyDeprecationMiddleware());
+
   // Better Auth owns every `/api/auth/*` endpoint (§4.1): sign-up, sign-in,
   // sign-out, session, and the organization plugin endpoints.
   app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
@@ -138,12 +157,45 @@ export const createApp = (dependencies: AppDependencies): Hono<AppEnv> => {
     }),
   );
 
-  app.route("/api/registration", registrationRouter);
+  // The versioned product surface (§4.10). These are the paths the OpenAPI
+  // document describes and the paths the contract is tested against.
+  app.route("/api/v1/registration", registrationRouter);
   app.route(
-    "/api/contacts",
+    "/api/v1/contacts",
     createContactsRouter({ bulkMaxContacts: env.BULK_MAX_CONTACTS }),
   );
-  app.route("/api/branches", createBranchesRouter());
+  app.route("/api/v1/branches", createBranchesRouter());
+
+  // The deprecated aliases (§4.10): the very same handlers, mounted on the
+  // historical paths. They are wrapped in a plain Hono application, so the
+  // published contract only describes the versioned surface.
+  const legacyContacts = new Hono<AppEnv>();
+  legacyContacts.route(
+    "/",
+    createContactsRouter({ bulkMaxContacts: env.BULK_MAX_CONTACTS }),
+  );
+  app.route("/api/contacts", legacyContacts);
+
+  const legacyBranches = new Hono<AppEnv>();
+  legacyBranches.route("/", createBranchesRouter());
+  app.route("/api/branches", legacyBranches);
+
+  const legacyRegistration = new Hono<AppEnv>();
+  legacyRegistration.route("/", registrationRouter);
+  app.route("/api/registration", legacyRegistration);
+
+  // The contract itself (§4.10): the OpenAPI 3.1 document, generated from the
+  // schemas the running application uses, and the page that renders it.
+  app.get("/api/v1/openapi.json", (c) =>
+    c.json(buildOpenApiDocument(app) as Record<string, unknown>),
+  );
+
+  app.get("/api/v1/docs", (c) => {
+    // The default policy of the API would block the CDN that serves the
+    // Swagger UI bundle, so the documentation route relaxes it (§4.10).
+    c.header("content-security-policy", swaggerUiContentSecurityPolicy);
+    return c.html(swaggerUiHtml("/api/v1/openapi.json"));
+  });
 
   // Unknown routes still answer with the JSON envelope instead of Hono's
   // plain-text default, keeping the response contract intact.

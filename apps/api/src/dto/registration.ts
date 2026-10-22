@@ -1,4 +1,3 @@
-import type { RegistrationStatus } from "@opensaas/auth";
 import { z } from "zod";
 
 /**
@@ -20,9 +19,18 @@ export const registerRequestSchema = z.object({
 /** A registration request, parsed. */
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;
 
+/**
+ * Zod schema of the result of a registration, as the API returns it.
+ *
+ * The schema is the single source of the wire format: the TypeScript type is
+ * inferred from it, and the generated OpenAPI document describes the same
+ * shape, so the three cannot drift (§4.10).
+ */
+export const registrationDtoSchema = z.object({
+  email: z.string(),
+  status: z.enum(["active", "waitlist"]),
+  message: z.string(),
+});
+
 /** The result of a registration, as the API returns it. */
-export type RegistrationDto = {
-  email: string;
-  status: RegistrationStatus;
-  message: string;
-};
+export type RegistrationDto = z.infer<typeof registrationDtoSchema>;

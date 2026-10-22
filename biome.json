@@ -1,7 +1,7 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.8.3/schema.json",
   "files": {
-    "ignore": ["packages/database/drizzle/**"]
+    "ignore": ["packages/database/drizzle/**", "apps/api/openapi.json"]
   },
   "organizeImports": {
     "enabled": true

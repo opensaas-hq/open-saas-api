@@ -80,7 +80,7 @@ describe("Apps/API - Cross-cutting middleware pipeline (§4.5)", () => {
     const { app } = createTestApp({ BODY_SIZE_LIMIT_BYTES: 64 });
 
     const res = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/registration`, {
+      new Request(`${APP_ORIGIN}/api/v1/registration`, {
         method: "POST",
         headers: jsonHeaders(),
         body: JSON.stringify({ padding: "x".repeat(512) }),
@@ -109,7 +109,7 @@ describe("Apps/API - Cross-cutting middleware pipeline (§4.5)", () => {
     // registration flow itself.
     const attempt = async () =>
       await app.fetch(
-        new Request(`${APP_ORIGIN}/api/registration`, {
+        new Request(`${APP_ORIGIN}/api/v1/registration`, {
           method: "POST",
           headers: jsonHeaders(),
           body: JSON.stringify({}),
@@ -237,7 +237,7 @@ describeIfDb(
       });
 
       const res = await app.fetch(
-        new Request(`${APP_ORIGIN}/api/contacts/bulk`, {
+        new Request(`${APP_ORIGIN}/api/v1/contacts/bulk`, {
           method: "POST",
           headers: jsonHeaders(tenant.cookie),
           body: JSON.stringify({
@@ -263,7 +263,7 @@ describeIfDb(
       });
 
       const res = await app.fetch(
-        new Request(`${APP_ORIGIN}/api/contacts`, {
+        new Request(`${APP_ORIGIN}/api/v1/contacts`, {
           method: "POST",
           headers: jsonHeaders(tenant.cookie),
           body: JSON.stringify({

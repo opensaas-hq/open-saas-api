@@ -69,7 +69,7 @@ describeIfDb("Apps/API - Service layer, DTOs and audit trail (§4.4)", () => {
     });
 
     const res = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts`, {
         method: "POST",
         headers: jsonHeaders(tenant.cookie),
         body: JSON.stringify({ name: "Audited Contact" }),
@@ -96,7 +96,7 @@ describeIfDb("Apps/API - Service layer, DTOs and audit trail (§4.4)", () => {
     const email = `registered-${Date.now().toString(36)}@example.com`;
 
     const res = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/registration`, {
+      new Request(`${APP_ORIGIN}/api/v1/registration`, {
         method: "POST",
         headers: jsonHeaders(),
         body: JSON.stringify({
@@ -165,7 +165,7 @@ describeIfDb("Apps/API - Service layer, DTOs and audit trail (§4.4)", () => {
     });
 
     const res = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts/bulk`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts/bulk`, {
         method: "POST",
         headers: jsonHeaders(tenant.cookie),
         body: JSON.stringify({
@@ -200,7 +200,7 @@ describeIfDb("Apps/API - Service layer, DTOs and audit trail (§4.4)", () => {
     });
 
     const res = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts`, {
         method: "POST",
         headers: {
           ...jsonHeaders(tenant.cookie),
@@ -226,7 +226,7 @@ describeIfDb("Apps/API - Service layer, DTOs and audit trail (§4.4)", () => {
 
     const post = async (metadata: Record<string, unknown>) =>
       await app.fetch(
-        new Request(`${APP_ORIGIN}/api/contacts`, {
+        new Request(`${APP_ORIGIN}/api/v1/contacts`, {
           method: "POST",
           headers: jsonHeaders(tenant.cookie),
           body: JSON.stringify({ name: "Capped", metadata }),

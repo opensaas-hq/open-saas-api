@@ -72,7 +72,7 @@ describeIfDb("Apps/API - Tenant isolation and RBAC (§4.3)", () => {
     });
 
     const res = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts`, {
         headers: jsonHeaders(tenant.cookie),
       }),
     );
@@ -104,7 +104,7 @@ describeIfDb("Apps/API - Tenant isolation and RBAC (§4.3)", () => {
 
     // Listing with the foreign branch in the header is refused.
     const list = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts`, {
         headers: {
           ...jsonHeaders(tenant.cookie),
           "x-branch-id": foreignBranch?.id ?? "",
@@ -116,7 +116,7 @@ describeIfDb("Apps/API - Tenant isolation and RBAC (§4.3)", () => {
     // The same branch in the query string is refused too.
     const listByQuery = await app.fetch(
       new Request(
-        `${APP_ORIGIN}/api/contacts?branchId=${foreignBranch?.id ?? ""}`,
+        `${APP_ORIGIN}/api/v1/contacts?branchId=${foreignBranch?.id ?? ""}`,
         { headers: jsonHeaders(tenant.cookie) },
       ),
     );
@@ -124,7 +124,7 @@ describeIfDb("Apps/API - Tenant isolation and RBAC (§4.3)", () => {
 
     // And so is a contact created against it.
     const create = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts`, {
         method: "POST",
         headers: jsonHeaders(tenant.cookie),
         body: JSON.stringify({
@@ -155,7 +155,7 @@ describeIfDb("Apps/API - Tenant isolation and RBAC (§4.3)", () => {
     });
 
     const res = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts`, {
         method: "POST",
         headers: jsonHeaders(tenant.cookie),
         body: JSON.stringify({
@@ -179,7 +179,7 @@ describeIfDb("Apps/API - Tenant isolation and RBAC (§4.3)", () => {
 
     const bulk = async () =>
       await app.fetch(
-        new Request(`${APP_ORIGIN}/api/contacts/bulk`, {
+        new Request(`${APP_ORIGIN}/api/v1/contacts/bulk`, {
           method: "POST",
           headers: jsonHeaders(tenant.cookie),
           body: JSON.stringify({
@@ -221,7 +221,7 @@ describeIfDb("Apps/API - Tenant isolation and RBAC (§4.3)", () => {
     });
 
     const res = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts`, {
         headers: {
           ...jsonHeaders(tenant.cookie),
           "x-branch-id": "not-a-uuid",

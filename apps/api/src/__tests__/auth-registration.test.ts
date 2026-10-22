@@ -12,7 +12,7 @@ const describeIfDb = hasTestDatabase() ? describe : describe.skip;
 
 const register = async (app: Hono<AppEnv>, body: Record<string, unknown>) =>
   await app.fetch(
-    new Request("http://localhost/api/registration", {
+    new Request("http://localhost/api/v1/registration", {
       method: "POST",
       headers: jsonHeaders(),
       body: JSON.stringify(body),
@@ -20,7 +20,7 @@ const register = async (app: Hono<AppEnv>, body: Record<string, unknown>) =>
   );
 
 describeIfDb(
-  "Apps/API - Auth Registration Integration Routes (/api/registration)",
+  "Apps/API - Auth Registration Integration Routes (/api/v1/registration)",
   () => {
     beforeEach(async () => {
       await withRawTransaction(async (tx) => {

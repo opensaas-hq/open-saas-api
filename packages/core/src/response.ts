@@ -13,6 +13,20 @@ export type PaginationMeta = {
 };
 
 /**
+ * Zod schema of the pagination metadata.
+ *
+ * The schema is the machine-readable half of the contract (§4.10): the
+ * generated OpenAPI document describes the pagination exactly as the runtime
+ * builds it, so the two cannot drift.
+ */
+export const paginationMetaSchema = z.object({
+  page: z.number().int().positive(),
+  limit: z.number().int().positive(),
+  total: z.number().int().nonnegative(),
+  totalPages: z.number().int().nonnegative(),
+});
+
+/**
  * Success branch of the response envelope: `success: true` discriminates it
  * from {@link ApiErrorResponse}. `pagination` is present only for collections.
  */
@@ -41,6 +55,37 @@ export type ApiErrorResponse = {
  * {@link ok} / {@link fail}; consumed as the response type by handlers.
  */
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
+
+/**
+ * Zod schema of the error branch of the envelope.
+ *
+ * `details` is optional and free-form: it carries field-level information
+ * (e.g. validation) and never leaks internals on 500-class errors.
+ */
+export const apiErrorResponseSchema = z.object({
+  success: z.literal(false),
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    details: z.unknown().optional(),
+  }),
+});
+
+/**
+ * Build the Zod schema of the success branch of the envelope.
+ *
+ * The schema is derived from the data schema, so a documented response always
+ * matches the payload the endpoint actually returns (§4.10).
+ */
+export const apiSuccessResponseSchema = <T extends z.ZodType>(
+  data: T,
+  withPagination = false,
+) =>
+  z.object({
+    success: z.literal(true),
+    data,
+    ...(withPagination ? { pagination: paginationMetaSchema } : {}),
+  });
 
 /**
  * Build a success envelope. This module is the single place that constructs

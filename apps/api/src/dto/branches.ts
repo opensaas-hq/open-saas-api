@@ -28,12 +28,21 @@ export const branchIdParamSchema = z.object({
   id: z.uuid("The branch id must be a uuid"),
 });
 
+/**
+ * Zod schema of a branch as the API returns it.
+ *
+ * The schema is the single source of the wire format: the TypeScript type is
+ * inferred from it, and the generated OpenAPI document describes the same
+ * shape, so the three cannot drift (§4.10).
+ */
+export const branchDtoSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  createdAt: z.string(),
+});
+
 /** A branch as the API returns it. */
-export type BranchDto = {
-  id: string;
-  name: string;
-  createdAt: string;
-};
+export type BranchDto = z.infer<typeof branchDtoSchema>;
 
 /**
  * Map a branch row to its API representation.

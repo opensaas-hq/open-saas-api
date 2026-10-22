@@ -174,7 +174,7 @@ describeIfDb("Apps/API - Mounted Better Auth surface (§4.1)", () => {
     // The organization plugin set the active organization on the session, so
     // the tenant middleware resolves a tenant and the route answers 200.
     const list = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts`, {
         headers: jsonHeaders(cookie),
       }),
     );
@@ -191,7 +191,7 @@ describeIfDb("Apps/API - Mounted Better Auth surface (§4.1)", () => {
   test("a tenant-scoped route without a session is still refused with 401", async () => {
     const { app } = createTestApp();
 
-    const res = await app.fetch(new Request(`${APP_ORIGIN}/api/contacts`));
+    const res = await app.fetch(new Request(`${APP_ORIGIN}/api/v1/contacts`));
 
     expect(res.status).toBe(401);
     const body = (await res.json()) as { error?: { code?: string } };
@@ -218,7 +218,7 @@ describeIfDb("Apps/API - Mounted Better Auth surface (§4.1)", () => {
     // ... and the project-owned registration lives outside it (§4.1 path
     // decision), answering on its own path.
     const registerRes = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/registration`, {
+      new Request(`${APP_ORIGIN}/api/v1/registration`, {
         method: "POST",
         headers: jsonHeaders(),
         body: JSON.stringify({

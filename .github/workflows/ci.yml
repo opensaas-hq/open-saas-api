@@ -44,6 +44,9 @@ jobs:
       - name: Run TypeScript Typecheck
         run: bun run typecheck
 
+      - name: Check the OpenAPI contract is in sync
+        run: bun run --filter @opensaas/api openapi:check
+
       - name: Run Database Push
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test

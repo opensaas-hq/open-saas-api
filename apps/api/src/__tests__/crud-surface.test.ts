@@ -42,7 +42,7 @@ const createContact = async (
   name: string,
 ): Promise<string> => {
   const res = await app.fetch(
-    new Request(`${APP_ORIGIN}/api/contacts`, {
+    new Request(`${APP_ORIGIN}/api/v1/contacts`, {
       method: "POST",
       headers: jsonHeaders(cookie),
       body: JSON.stringify({ name }),
@@ -76,7 +76,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     await close();
   });
 
-  test("GET /api/contacts/:id returns the contact of the tenant", async () => {
+  test("GET /api/v1/contacts/:id returns the contact of the tenant", async () => {
     const { app } = createAppWithoutCache();
     const tenant = await createTenant(app, {
       email: "read@example.com",
@@ -88,7 +88,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     const id = await createContact(app, tenant.cookie, "Readable");
 
     const res = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts/${id}`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts/${id}`, {
         headers: jsonHeaders(tenant.cookie),
       }),
     );
@@ -101,7 +101,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     expect(body.data?.name).toBe("Readable");
   });
 
-  test("GET /api/contacts/:id of another tenant is reported as missing", async () => {
+  test("GET /api/v1/contacts/:id of another tenant is reported as missing", async () => {
     const { app } = createAppWithoutCache();
     const tenant = await createTenant(app, {
       email: "owner-a@example.com",
@@ -119,7 +119,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     const id = await createContact(app, other.cookie, "Foreign");
 
     const res = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts/${id}`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts/${id}`, {
         headers: jsonHeaders(tenant.cookie),
       }),
     );
@@ -131,7 +131,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     expect(body.error?.code).toBe("NOT_FOUND");
   });
 
-  test("PATCH /api/contacts/:id updates the contact", async () => {
+  test("PATCH /api/v1/contacts/:id updates the contact", async () => {
     const { app } = createAppWithoutCache();
     const tenant = await createTenant(app, {
       email: "patch@example.com",
@@ -143,7 +143,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     const id = await createContact(app, tenant.cookie, "Before");
 
     const res = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts/${id}`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts/${id}`, {
         method: "PATCH",
         headers: jsonHeaders(tenant.cookie),
         body: JSON.stringify({ name: "After" }),
@@ -159,7 +159,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     expect(rows.find((row) => row.id === id)?.name).toBe("After");
   });
 
-  test("PATCH /api/contacts/:id of another tenant changes nothing", async () => {
+  test("PATCH /api/v1/contacts/:id of another tenant changes nothing", async () => {
     const { app } = createAppWithoutCache();
     const tenant = await createTenant(app, {
       email: "cross-a@example.com",
@@ -177,7 +177,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     const id = await createContact(app, other.cookie, "Untouched");
 
     const res = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts/${id}`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts/${id}`, {
         method: "PATCH",
         headers: jsonHeaders(tenant.cookie),
         body: JSON.stringify({ name: "Hijacked" }),
@@ -190,7 +190,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     expect(rows.find((row) => row.id === id)?.name).toBe("Untouched");
   });
 
-  test("DELETE /api/contacts/:id is denied to a member and allowed to an owner", async () => {
+  test("DELETE /api/v1/contacts/:id is denied to a member and allowed to an owner", async () => {
     const { app } = createAppWithoutCache();
     const tenant = await createTenant(app, {
       email: "delete@example.com",
@@ -203,7 +203,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
 
     const remove = async () =>
       await app.fetch(
-        new Request(`${APP_ORIGIN}/api/contacts/${id}`, {
+        new Request(`${APP_ORIGIN}/api/v1/contacts/${id}`, {
           method: "DELETE",
           headers: jsonHeaders(tenant.cookie),
         }),
@@ -239,7 +239,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     expect(after.filter((row) => row.id === id)).toHaveLength(0);
   });
 
-  test("GET /api/contacts answers a matching If-None-Match with a 304 and no body", async () => {
+  test("GET /api/v1/contacts answers a matching If-None-Match with a 304 and no body", async () => {
     const { app } = createAppWithoutCache();
     const tenant = await createTenant(app, {
       email: "etag@example.com",
@@ -251,7 +251,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     await createContact(app, tenant.cookie, "Cached");
 
     const first = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts`, {
         headers: jsonHeaders(tenant.cookie),
       }),
     );
@@ -261,7 +261,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     expect(etag).not.toBeNull();
 
     const second = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/contacts`, {
+      new Request(`${APP_ORIGIN}/api/v1/contacts`, {
         headers: { ...jsonHeaders(tenant.cookie), "if-none-match": etag ?? "" },
       }),
     );
@@ -281,7 +281,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     });
 
     const create = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/branches`, {
+      new Request(`${APP_ORIGIN}/api/v1/branches`, {
         method: "POST",
         headers: jsonHeaders(tenant.cookie),
         body: JSON.stringify({ name: "Main Street" }),
@@ -294,7 +294,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     expect(branchId).not.toBe("");
 
     const list = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/branches`, {
+      new Request(`${APP_ORIGIN}/api/v1/branches`, {
         headers: jsonHeaders(tenant.cookie),
       }),
     );
@@ -304,7 +304,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     expect(listed.data?.map((branch) => branch.id)).toContain(branchId);
 
     const update = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/branches/${branchId}`, {
+      new Request(`${APP_ORIGIN}/api/v1/branches/${branchId}`, {
         method: "PATCH",
         headers: jsonHeaders(tenant.cookie),
         body: JSON.stringify({ name: "Second Street" }),
@@ -316,7 +316,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     expect(updated.data?.name).toBe("Second Street");
 
     const remove = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/branches/${branchId}`, {
+      new Request(`${APP_ORIGIN}/api/v1/branches/${branchId}`, {
         method: "DELETE",
         headers: jsonHeaders(tenant.cookie),
       }),
@@ -344,7 +344,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     });
 
     const create = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/branches`, {
+      new Request(`${APP_ORIGIN}/api/v1/branches`, {
         method: "POST",
         headers: jsonHeaders(tenant.cookie),
         body: JSON.stringify({ name: "Forbidden" }),
@@ -355,7 +355,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
 
     // The listing stays available to a member.
     const list = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/branches`, {
+      new Request(`${APP_ORIGIN}/api/v1/branches`, {
         headers: jsonHeaders(tenant.cookie),
       }),
     );
@@ -378,7 +378,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     });
 
     const create = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/branches`, {
+      new Request(`${APP_ORIGIN}/api/v1/branches`, {
         method: "POST",
         headers: jsonHeaders(other.cookie),
         body: JSON.stringify({ name: "Foreign" }),
@@ -389,7 +389,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     const branchId = created.data?.id ?? "";
 
     const list = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/branches`, {
+      new Request(`${APP_ORIGIN}/api/v1/branches`, {
         headers: jsonHeaders(tenant.cookie),
       }),
     );
@@ -398,7 +398,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     expect(listed.data?.map((branch) => branch.id)).not.toContain(branchId);
 
     const update = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/branches/${branchId}`, {
+      new Request(`${APP_ORIGIN}/api/v1/branches/${branchId}`, {
         method: "PATCH",
         headers: jsonHeaders(tenant.cookie),
         body: JSON.stringify({ name: "Hijacked" }),
@@ -408,7 +408,7 @@ describeIfDb("Apps/API - CRUD surface (§4.9)", () => {
     expect(update.status).toBe(404);
 
     const remove = await app.fetch(
-      new Request(`${APP_ORIGIN}/api/branches/${branchId}`, {
+      new Request(`${APP_ORIGIN}/api/v1/branches/${branchId}`, {
         method: "DELETE",
         headers: jsonHeaders(tenant.cookie),
       }),
