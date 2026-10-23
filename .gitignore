@@ -95,3 +95,4 @@ drizzle/*.sql.json
 .idea/
 .node_repl_history
 .tern-port
+docs/
