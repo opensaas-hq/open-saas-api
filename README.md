@@ -37,6 +37,8 @@ bun --filter @opensaas/database db:migrate
 bun run dev
 ```
 
+> **Migrations:** Always use `bun --filter @opensaas/database db:migrate`. `db:push` is local-dev-only and must not be used in production/CI.
+
 ## Environment Variables
 
 See [.env.example](.env.example) for all configuration options.

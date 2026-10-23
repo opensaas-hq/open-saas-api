@@ -17,7 +17,9 @@
 
 ## Migrations
 
-Use `db:generate` to create migrations, review SQL, then `db:migrate`. Never use `db:push` in production.
+Use `db:generate` to create migrations, review SQL, then `db:migrate`. 
+- `db:migrate` is the **only supported path** for provisioning schemas (including production/CI).
+- `db:push` is **local-dev-only** for throwaway experiments; never use it for production or CI provisioning.
 
 ## Testing
 
