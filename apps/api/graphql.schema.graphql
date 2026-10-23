@@ -1,14 +1,20 @@
-"""An arbitrary JSON value."""
+"""
+An arbitrary JSON value.
+"""
 scalar JSON
 
-"""The lifecycle status of a contact."""
+"""
+The lifecycle status of a contact.
+"""
 enum ContactStatus {
   ACTIVE
   LEAD
   CHURNED
 }
 
-"""The organization the session is active on."""
+"""
+The organization the session is active on.
+"""
 type Organization {
   id: ID!
   name: String!
@@ -16,14 +22,18 @@ type Organization {
   createdAt: String!
 }
 
-"""A branch of the organization."""
+"""
+A branch of the organization.
+"""
 type Branch {
   id: ID!
   name: String!
   createdAt: String!
 }
 
-"""A contact of the organization."""
+"""
+A contact of the organization.
+"""
 type Contact {
   id: ID!
   name: String!
@@ -37,7 +47,9 @@ type Contact {
   updatedAt: String!
 }
 
-"""Pagination of a list of contacts."""
+"""
+Pagination of a list of contacts.
+"""
 type PageInfo {
   page: Int!
   limit: Int!
@@ -45,20 +57,26 @@ type PageInfo {
   totalPages: Int!
 }
 
-"""A page of contacts."""
+"""
+A page of contacts.
+"""
 type ContactPage {
   items: [Contact!]!
   pagination: PageInfo!
 }
 
-"""Narrowing of a contacts query."""
+"""
+Narrowing of a contacts query.
+"""
 input ContactFilter {
   status: ContactStatus
   branchId: ID
   search: String
 }
 
-"""Payload of a contact creation."""
+"""
+Payload of a contact creation.
+"""
 input CreateContactInput {
   name: String!
   phone: String
@@ -69,7 +87,9 @@ input CreateContactInput {
   metadata: JSON
 }
 
-"""Payload of a partial contact update; absent fields are not written."""
+"""
+Payload of a partial contact update; absent fields are not written.
+"""
 input UpdateContactInput {
   name: String
   phone: String
@@ -80,68 +100,105 @@ input UpdateContactInput {
   metadata: JSON
 }
 
-"""Payload of a branch creation."""
+"""
+Payload of a branch creation.
+"""
 input CreateBranchInput {
   name: String!
 }
 
-"""Payload of a branch update."""
+"""
+Payload of a branch update.
+"""
 input UpdateBranchInput {
   name: String!
 }
 
-"""Result of a contact deletion."""
+"""
+Result of a contact deletion.
+"""
 type DeleteContactPayload {
   id: ID!
 }
 
-"""Result of a branch deletion."""
+"""
+Result of a branch deletion.
+"""
 type DeleteBranchPayload {
   id: ID!
 }
 
-"""Result of a bulk import."""
+"""
+Result of a bulk import.
+"""
 type ImportContactsPayload {
   count: Int!
   contacts: [Contact!]!
 }
 
 type Query {
-  """The organization the session is active on."""
+  """
+  The organization the session is active on.
+  """
   organization: Organization!
 
-  """One contact of the organization, or null plus a NOT_FOUND error."""
+  """
+  One contact of the organization, or null plus a NOT_FOUND error.
+  """
   contact(id: ID!): Contact
 
-  """A page of the contacts of the organization."""
+  """
+  A page of the contacts of the organization.
+  """
   contacts(page: Int = 1, limit: Int = 20, filter: ContactFilter): ContactPage!
 
-  """One branch of the organization, or null plus a NOT_FOUND error."""
+  """
+  One branch of the organization, or null plus a NOT_FOUND error.
+  """
   branch(id: ID!): Branch
 
-  """The branches of the organization."""
+  """
+  The branches of the organization.
+  """
   branches: [Branch!]!
 }
 
 type Mutation {
-  """Create a contact."""
+  """
+  Create a contact.
+  """
   createContact(input: CreateContactInput!): Contact!
 
-  """Update a contact; absent fields are not written."""
+  """
+  Update a contact; absent fields are not written.
+  """
   updateContact(id: ID!, input: UpdateContactInput!): Contact!
 
-  """Delete a contact."""
+  """
+  Delete a contact.
+  """
   deleteContact(id: ID!): DeleteContactPayload!
 
-  """Import several contacts in one transaction."""
-  importContacts(contacts: [CreateContactInput!]!, branchId: ID): ImportContactsPayload!
+  """
+  Import several contacts in one transaction.
+  """
+  importContacts(
+    contacts: [CreateContactInput!]!
+    branchId: ID
+  ): ImportContactsPayload!
 
-  """Create a branch."""
+  """
+  Create a branch.
+  """
   createBranch(input: CreateBranchInput!): Branch!
 
-  """Rename a branch."""
+  """
+  Rename a branch.
+  """
   updateBranch(id: ID!, input: UpdateBranchInput!): Branch!
 
-  """Delete a branch."""
+  """
+  Delete a branch.
+  """
   deleteBranch(id: ID!): DeleteBranchPayload!
 }

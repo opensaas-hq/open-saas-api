@@ -1,37 +1,59 @@
 # open-saas-api
 
-Modular multi-tenant SaaS automation engine built with Bun, Hono, and Drizzle.
+Production-oriented multi-tenant SaaS API built with Bun, Hono, Drizzle ORM, and Better Auth.
 
-## API
+## Features
 
-The product API is versioned: every product route lives under `/api/v1`
-(health probes stay unprefixed).
+- **Multi-tenancy**: Tenant-scoped queries with membership verification and Postgres RLS (defense in depth)
+- **Auth**: Email/password auth, organizations, roles/permissions via Better Auth
+- **REST API**: Versioned under `/api/v1` with OpenAPI 3.1 and Swagger UI at `/api/v1/docs`
+- **GraphQL**: CRM schema at `/graphql` with depth/complexity limits
+- **Validation**: Zod schemas at every boundary
+- **Type-safe**: End-to-end TypeScript with strict mode
 
-| Resource  | Versioned surface      | Deprecated alias      |
-| --------- | ---------------------- | --------------------- |
-| Contacts  | `/api/v1/contacts`     | `/api/contacts`       |
-| Branches  | `/api/v1/branches`     | `/api/branches`       |
-| Users     | `/api/v1/registration` | `/api/registration`   |
-| Readiness | `/readyz`              | `/api/health`         |
+## Quickstart (Docker)
 
-- Contract (OpenAPI 3.1): `/api/v1/openapi.json`
-- Interactive reference (Swagger UI): `/api/v1/docs`
-- Liveness / readiness: `/healthz`, `/readyz`
+```bash
+cp .env.example .env
+# Edit .env with your secrets
+docker compose up --build
+```
 
-Run the API with `bun run dev` and open
-`http://localhost:3000/api/v1/docs` (the port is `PORT`, default `3000`).
+API available at http://localhost:3000
 
-### Versioning and deprecation policy
+- Health: `GET /healthz`
+- Ready: `GET /readyz`
+- OpenAPI: `GET /api/v1/openapi.json`
+- Swagger UI: `GET /api/v1/docs`
+- GraphQL: `POST /graphql`
 
-- Every product route is published under `/api/v1`. A breaking change ships
-  under a new prefix (`/api/v2`) and `/api/v1` keeps working.
-- The historical unprefixed paths are deprecated aliases of the versioned
-  routes. They answer exactly like their successors and announce their own end
-  on **every** response:
-  - `Deprecation: true` (RFC 8594)
-  - `Sunset: Wed, 31 Mar 2027 23:59:59 GMT` — after this date the aliases are
-    removed
-  - `Link: </api/v1/contacts>; rel="successor-version"` (RFC 8288)
-- The OpenAPI document is generated from the same Zod schemas the API validates
-  and serializes. CI regenerates it and fails when the committed snapshot
-  drifts from the routes (`bun run --filter @opensaas/api openapi:check`).
+## Local Development
+
+```bash
+bun install
+cp .env.example .env
+# Start Postgres and run migrations
+bun --filter @opensaas/database db:migrate
+bun run dev
+```
+
+## Environment Variables
+
+See [.env.example](.env.example) for all configuration options.
+
+## Testing
+
+```bash
+bun test              # All tests
+bun run test:unit     # Unit tests (no DB required)
+bun run test:integration  # Integration tests
+```
+
+## API Versioning
+
+- Current version: v1 at `/api/v1/*`
+- Legacy routes under `/api/*` are deprecated with `Deprecation`, `Sunset`, and `Link` headers
+
+## License
+
+MIT
