@@ -17,7 +17,7 @@ initConfig();
 
 // Derive local env/logger from the factories instead of importing singletons.
 // The logger is built here and injected into the app: no request-scoped code
-// reaches for a process-wide logger anymore (§4.5, TD-11).
+// reaches for a process-wide logger anymore (§4.5).
 const env = getEnv();
 const logger = createLogger(env);
 
@@ -37,7 +37,7 @@ await waitForDatabase();
 // single request: the effective role must not bypass the policies, every
 // protected table must enforce them, and the tenant GUC must work. A
 // misconfigured connection fails the boot instead of serving traffic with an
-// unenforced tenancy boundary (§2.5, TD-38).
+// unenforced tenancy boundary (§2.5, TD-48).
 if (env.RLS_ENABLED) {
   const report = await executeResilient(() => assertRlsEnforcement(db), {
     idempotent: true,

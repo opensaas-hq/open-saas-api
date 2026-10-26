@@ -10,11 +10,11 @@ import { close, db, resetDb } from "../client";
  * diverge, a test run would write to development data. Fail loudly and early.
  *
  * Reads `process.env` directly: `getEnv()` is memoized and other suites may
- * have re-initialized it with a synthetic config (TD-11).
+ * have re-initialized it with a synthetic config.
  */
 export const assertTestDatabase = (): void => {
   // Another suite may have re-initialized the memoized config with a synthetic
-  // environment (TD-11). Drop it — and any handle built from it — so the lazy
+  // environment. Drop it — and any handle built from it — so the lazy
   // client rebuilds from the real process environment, then verify the target.
   resetConfig();
   resetDb();

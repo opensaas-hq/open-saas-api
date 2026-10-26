@@ -36,7 +36,7 @@ export async function createOrganization(input: CreateOrganizationInput) {
 /** Options for {@link getOrganizationById}. */
 export type GetOrganizationByIdOptions = {
   id: string;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 

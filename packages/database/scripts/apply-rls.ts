@@ -8,7 +8,7 @@ import postgres from "postgres";
  *
  * This is not a migration runner: there is no released schema yet, so the RLS
  * bootstrap is applied explicitly by the test/CI job (and later by a documented
- * deploy step). See docs/architecture/multitenancy.md.
+ * deploy step). See docs/architecture/multi-tenancy.md.
  *
  * Usage: bun --env-file=../../.env.test scripts/apply-rls.ts setup|teardown
  */

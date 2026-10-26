@@ -6,7 +6,7 @@ import { branches } from "../schema";
 export type ListBranchesOptions = {
   organizationId: string;
   tx?: Transaction;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 
@@ -15,7 +15,7 @@ export type CreateBranchOptions = {
   organizationId: string;
   name: string;
   tx?: Transaction;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 
@@ -25,7 +25,7 @@ export type UpdateBranchOptions = {
   id: string;
   name: string;
   tx?: Transaction;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 
@@ -34,7 +34,7 @@ export type DeleteBranchOptions = {
   organizationId: string;
   id: string;
   tx?: Transaction;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 
@@ -43,7 +43,7 @@ export type GetBranchByIdOptions = {
   organizationId: string;
   id: string;
   tx?: Transaction;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 

@@ -13,7 +13,7 @@ export type MemberLookupOptions = {
   userId: string;
   /**
    * Handle to run the query on. Defaults to the process-global proxy, so an
-   * injected handle reaches the data layer (TD-23).
+   * injected handle reaches the data layer (TD-35).
    */
   db?: Database;
 };
@@ -23,7 +23,7 @@ export type ListMembersOptions = {
   /** The organization whose memberships are listed. */
   organizationId: string;
   /**
-   * Handle to run the query on. Defaults to the process-global proxy (TD-23).
+   * Handle to run the query on. Defaults to the process-global proxy (TD-35).
    */
   db?: Database;
 };

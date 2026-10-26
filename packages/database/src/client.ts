@@ -267,7 +267,7 @@ export const resetDb = (): void => {
  * tenant-scoped (migrations, health probes, framework tables).
  *
  * `db` overrides the process-global handle, so an injected handle reaches the
- * data layer instead of the module proxy (TD-23).
+ * data layer instead of the module proxy (TD-35).
  */
 export async function withRawTransaction<T>(
   callback: (tx: Transaction) => Promise<T>,
@@ -284,7 +284,7 @@ export type TenantTransactionOptions<T> = {
   callback: (tx: Transaction) => Promise<T>;
   /**
    * Handle to run the transaction on. Defaults to the process-global proxy;
-   * an injected handle keeps the transaction on the caller's connection (TD-23).
+   * an injected handle keeps the transaction on the caller's connection (TD-35).
    */
   db?: Database;
 };
@@ -353,7 +353,7 @@ export type TenantContextOptions<T> = {
   tx?: Transaction;
   /**
    * Handle to run the operation on. Defaults to the process-global proxy; an
-   * injected handle keeps the query on the caller's connection (TD-23).
+   * injected handle keeps the query on the caller's connection (TD-35).
    */
   db?: Database;
 };

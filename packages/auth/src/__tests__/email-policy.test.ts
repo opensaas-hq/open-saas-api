@@ -104,7 +104,7 @@ describe("@opensaas/auth - Email Policy & Anti-Abuse", () => {
         ).toThrow("Disposable/temporary email addresses are not allowed");
       } finally {
         // Restore the real process configuration so a shared-process test run
-        // (TD-11) rebuilds a valid config for later suites.
+        // rebuilds a valid config for later suites.
         resetConfig();
         initConfig();
       }

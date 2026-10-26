@@ -29,7 +29,7 @@ export type CreateAuthOptions = {
 /**
  * Build a Better Auth instance bound to a specific database executor and a
  * validated configuration. This is the factory form of the auth wiring
- * (formerly an import-time singleton — TD-05): callers pass the config and the
+ * (formerly an import-time singleton): callers pass the config and the
  * executor explicitly, so nothing is read at module scope.
  *
  * Passing a transaction object makes Better Auth's writes join that

@@ -11,6 +11,12 @@ Production-oriented multi-tenant SaaS API built with Bun, Hono, Drizzle ORM, and
 - **Validation**: Zod schemas at every boundary
 - **Type-safe**: End-to-end TypeScript with strict mode
 
+## Documentation
+
+The architecture and development guide lives in [docs/README.md](docs/README.md).
+Start there for the package layout, request lifecycle, multi-tenant guarantees,
+API contracts, extension playbooks, and technical debt.
+
 ## Quickstart (Docker)
 
 ```bash
@@ -35,6 +41,13 @@ cp .env.example .env
 # Start Postgres and run migrations
 bun --filter @opensaas/database db:migrate
 bun run dev
+```
+
+With the API running, the end-to-end example registers a user, activates the
+organization, creates a branch and a contact, and queries both REST and GraphQL:
+
+```bash
+bun run demo
 ```
 
 > **Migrations:** Always use `bun --filter @opensaas/database db:migrate`. `db:push` is local-dev-only and must not be used in production/CI.

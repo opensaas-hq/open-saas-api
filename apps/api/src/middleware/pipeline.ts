@@ -42,7 +42,7 @@ const ALLOWED_HEADERS = [
 /**
  * Build the cross-cutting middleware pipeline (§4.5).
  *
- * The order follows docs/v3/architecture.md §15.2 and is significant:
+ * The order follows docs/architecture/runtime.md §5.3 and is significant:
  *
  * 1. `request-id` — every later step and every log line can be correlated.
  * 2. access log — wraps the rest, so it observes the final status.

@@ -39,7 +39,7 @@ export type RegistrationServiceDeps = {
   audit: AuditPort;
   /**
    * Handle the registration transaction runs on. Defaults to the
-   * process-global proxy; the app factory injects its own handle (TD-23).
+   * process-global proxy; the app factory injects its own handle (TD-35).
    */
   db?: Database;
 };

@@ -183,7 +183,7 @@ export const invitation = pgTable("invitation", {
 /**
  * Project-owned waitlist registry. Registration in `waiting_list` mode records
  * a queryable row here instead of reshaping Better Auth's `user` table
- * (docs/v3/architecture.md §11.1). Keyed by email so a waitlisted registration
+ * (docs/architecture/data-and-services.md §11.3). Keyed by email so a waitlisted registration
  * that has no user yet is still captured.
  */
 export const waitlistEntry = pgTable(

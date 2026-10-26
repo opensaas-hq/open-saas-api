@@ -37,7 +37,7 @@ export type RegisterUserDependencies = {
   emailSender?: EmailSender;
   /**
    * Handle the registration transaction runs on. Optional; defaults to the
-   * process-global proxy, so an injected handle reaches the data layer (TD-23).
+   * process-global proxy, so an injected handle reaches the data layer (TD-35).
    */
   db?: Database;
 };

@@ -106,7 +106,7 @@ export type IdempotencyServiceDeps = {
   ttlSeconds: number;
   /**
    * Handle the entries are stored on. Defaults to the process-global proxy;
-   * the app factory injects its own handle (TD-23).
+   * the app factory injects its own handle (TD-35).
    */
   db?: Database;
   /**

@@ -16,7 +16,7 @@ export type OrganizationsService = {
 
 /** Dependencies of {@link createOrganizationsService}. */
 export type OrganizationsServiceDeps = {
-  /** Handle the repository runs on. Defaults to the process-global proxy (TD-23). */
+  /** Handle the repository runs on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 

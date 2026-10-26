@@ -2,7 +2,7 @@
 --
 -- Used to reset the test database between RLS test runs so results are
 -- reproducible. This is NOT a production rollback migration (none exists yet):
--- there is nothing deployed to roll back. See docs/architecture/multitenancy.md.
+-- there is nothing deployed to roll back. See docs/architecture/multi-tenancy.md.
 --
 -- Safe to run repeatedly.
 

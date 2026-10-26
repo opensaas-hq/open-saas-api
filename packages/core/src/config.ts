@@ -92,7 +92,7 @@ export const envSchema = z.object({
   // not a migration gate: when on, the client connects as the dedicated
   // `opensaas_app` role and every tenant-scoped transaction sets the
   // `app.current_org` GUC. Off in local development until the application-layer
-  // adoption lands; on in the RLS test job. See docs/architecture/multitenancy.md.
+  // adoption lands; on in the RLS test job. See docs/architecture/multi-tenancy.md.
   RLS_ENABLED: booleanFlag.default(false),
   DISPOSABLE_EMAIL_DOMAINS: z.string().optional(),
   // Comma-separated allowlist of browser origins accepted by Better Auth's

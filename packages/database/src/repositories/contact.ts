@@ -18,7 +18,7 @@ export type ContactInput = {
 export type CreateContactOptions = ContactInput & {
   organizationId: string;
   tx?: Transaction;
-  /** Handle to run the write on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the write on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 
@@ -27,7 +27,7 @@ export type CreateContactsBulkOptions = {
   organizationId: string;
   contacts: ContactInput[];
   tx?: Transaction;
-  /** Handle to run the write on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the write on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 
@@ -40,7 +40,7 @@ export type GetContactsOptions = {
   branchId?: string;
   search?: string;
   tx?: Transaction;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 
@@ -49,7 +49,7 @@ export type GetContactByIdOptions = {
   organizationId: string;
   id: string;
   tx?: Transaction;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 
@@ -69,7 +69,7 @@ export type UpdateContactOptions = ContactUpdate & {
   organizationId: string;
   id: string;
   tx?: Transaction;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 
@@ -78,7 +78,7 @@ export type DeleteContactOptions = {
   organizationId: string;
   id: string;
   tx?: Transaction;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 

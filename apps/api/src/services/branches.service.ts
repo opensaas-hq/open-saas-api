@@ -74,7 +74,7 @@ export type BranchesServiceDeps = {
   audit?: AuditPort;
   /**
    * Handle the repository runs on. Defaults to the process-global proxy; the
-   * app factory injects its own handle (TD-23).
+   * app factory injects its own handle (TD-35).
    */
   db?: Database;
 };

@@ -5,6 +5,7 @@
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
     "dev": "bun run --filter @opensaas/api dev",
+    "demo": "bun run docs/examples/demo.ts",
     "build": "bun run --filter \"*\" build",
     "typecheck": "bun --filter '*' typecheck",
     "test": "bun test",

@@ -25,7 +25,7 @@ export type InsertIdempotencyKeyOptions = IdempotencyKeyRef & {
   /** Moment the entry expires; a later request with the same key runs again. */
   expiresAt: Date;
   tx?: Transaction;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 
@@ -62,7 +62,7 @@ export async function insertIdempotencyKey(
 /** Options of {@link getIdempotencyKey}. */
 export type GetIdempotencyKeyOptions = IdempotencyKeyRef & {
   tx?: Transaction;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 
@@ -96,7 +96,7 @@ export type CompleteIdempotencyKeyOptions = IdempotencyKeyRef & {
   /** Body of the response that is stored for the replay. */
   responseBody: unknown;
   tx?: Transaction;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 
@@ -129,7 +129,7 @@ export async function completeIdempotencyKey(
 /** Options of {@link deleteIdempotencyKey}. */
 export type DeleteIdempotencyKeyOptions = IdempotencyKeyRef & {
   tx?: Transaction;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 
@@ -160,7 +160,7 @@ export type DeleteExpiredIdempotencyKeysOptions = {
   /** Moment the entries are considered expired. Defaults to now. */
   now?: Date;
   tx?: Transaction;
-  /** Handle to run the query on. Defaults to the process-global proxy (TD-23). */
+  /** Handle to run the query on. Defaults to the process-global proxy (TD-35). */
   db?: Database;
 };
 
