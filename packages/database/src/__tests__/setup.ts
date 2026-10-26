@@ -1,21 +1,6 @@
-import { beforeEach } from "bun:test";
-import { sql } from "drizzle-orm";
-import { db } from "../client";
-
-beforeEach(async () => {
-  try {
-    await db.execute(sql`
-      TRUNCATE TABLE
-        "contacts",
-        "branch",
-        "member",
-        "invitation",
-        "organization",
-        "account",
-        "session",
-        "verification",
-        "user"
-      RESTART IDENTITY CASCADE;
-    `);
-  } catch {}
-});
+/**
+ * Re-export of the isolation lifecycle. Suites that write must *call*
+ * `useTestDatabase()` in their own module body — importing a module that calls
+ * it once would register hooks only for the first file (the module is cached).
+ */
+export { useTestDatabase } from "./guard";

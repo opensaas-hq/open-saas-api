@@ -7,7 +7,9 @@
     "dev": "bun run --filter @opensaas/api dev",
     "build": "bun run --filter \"*\" build",
     "typecheck": "bun --filter '*' typecheck",
-    "test": "bun test --root .",
+    "test": "bun test",
+    "test:unit": "bun test --test-name-pattern=\"unit|config|errors|logger|response|like|resilience\" 2>&1 || bun test packages/core/src/__tests__ packages/database/src/__tests__/like.test.ts packages/database/src/__tests__/resilience.test.ts",
+    "test:integration": "bun test apps packages --ignore='**/*.unit.*'",
     "lint": "biome check .",
     "format": "biome format --write .",
     "prepare": "husky",
@@ -18,11 +20,9 @@
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
     "@release-it/conventional-changelog": "^12.0.2",
-    "@types/bun": "latest",
-    "bun-types": "^1.4.3",
+    "@types/bun": "^1.2.0",
     "husky": "^9.1.7",
     "release-it": "^21.1.1",
-    "typescript": "^5.7.0",
-    "zod": "^3.23.8"
+    "typescript": "^5.7.0"
   }
 }

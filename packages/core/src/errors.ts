@@ -51,25 +51,101 @@ export class ValidationError extends AppError {
   }
 }
 
-export type ApiSuccessResponse<T> = {
-  success: true;
-  data: T;
-};
-
-export type ApiErrorResponse = {
-  success: false;
-  error: {
-    code: string;
-    message: string;
-    details?: unknown;
-  };
-};
-
-export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
-
 export class ForbiddenError extends AppError {
   constructor(message = "Forbidden", details?: Record<string, unknown>) {
     super(message, 403, "FORBIDDEN", details);
     this.name = "ForbiddenError";
   }
 }
+
+/**
+ * 409 — the request conflicts with the current state of the resource, e.g.
+ * registering an email that already exists. A distinct status from 422 lets
+ * clients tell "invalid input" apart from "you cannot do that yet". The `code`
+ * defaults to the generic `CONFLICT` but can be narrowed to a stable,
+ * domain-specific value (e.g. `EMAIL_ALREADY_REGISTERED`).
+ */
+export class ConflictError extends AppError {
+  constructor(
+    message = "Conflict",
+    details?: Record<string, unknown>,
+    code = "CONFLICT",
+  ) {
+    super(message, 409, code, details);
+    this.name = "ConflictError";
+  }
+}
+
+/**
+ * 429 — the client exceeded the rate limit of the endpoint. The error carries
+ * the number of seconds the client should wait, so the HTTP layer can answer
+ * with the `Retry-After` header (§4.5).
+ */
+export class TooManyRequestsError extends AppError {
+  /** Seconds the client should wait before retrying. */
+  public readonly retryAfterSeconds: number;
+
+  constructor(
+    message = "Too many requests",
+    details?: Record<string, unknown>,
+    retryAfterSeconds = 60,
+  ) {
+    super(message, 429, "TOO_MANY_REQUESTS", details);
+    this.name = "TooManyRequestsError";
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+/**
+ * 413 — the request body is larger than the configured limit (§4.5). The
+ * limit is checked before the body is parsed, so an oversized payload is
+ * refused without being read into memory.
+ */
+export class PayloadTooLargeError extends AppError {
+  constructor(
+    message = "Payload too large",
+    details?: Record<string, unknown>,
+  ) {
+    super(message, 413, "PAYLOAD_TOO_LARGE", details);
+    this.name = "PayloadTooLargeError";
+  }
+}
+
+/**
+ * 503 — the service is temporarily unable to handle the request, e.g. a
+ * dependency is down or a circuit breaker is open. Callers may retry later.
+ */
+export class ServiceUnavailableError extends AppError {
+  constructor(
+    message = "Service temporarily unavailable",
+    details?: Record<string, unknown>,
+  ) {
+    super(message, 503, "SERVICE_UNAVAILABLE", details);
+    this.name = "ServiceUnavailableError";
+  }
+}
+
+/**
+ * 500 — a tenant-scoped operation was attempted without tenant context. This
+ * is a programming error, not a user error: the caller must supply an
+ * `organizationId` so the row-level-security GUC is set. It never resolves to
+ * an unscoped (permissive) query.
+ */
+export class TenantContextError extends AppError {
+  constructor(
+    message = "A tenant-scoped operation requires an organization context",
+    details?: Record<string, unknown>,
+  ) {
+    super(message, 500, "TENANT_CONTEXT_REQUIRED", details);
+    this.name = "TenantContextError";
+  }
+}
+
+// Response envelope types live in ./response; re-exported here for convenience
+// so existing `import { ApiResponse } from "@opensaas/core"` keeps working.
+export type {
+  ApiErrorResponse,
+  ApiResponse,
+  ApiSuccessResponse,
+  PaginationMeta,
+} from "./response";

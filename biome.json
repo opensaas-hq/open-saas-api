@@ -1,5 +1,12 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.8.3/schema.json",
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "files": {
+    "ignore": [
+      "packages/database/drizzle/**",
+      "apps/api/openapi.json",
+      "apps/api/graphql.schema.graphql"
+    ]
+  },
   "organizeImports": {
     "enabled": true
   },

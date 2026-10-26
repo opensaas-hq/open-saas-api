@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: omarchy
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: .
+      target: deps
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://admin:omarchy@postgres:5432/postgres
+    command: bun run --filter @opensaas/database db:migrate
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      target: runtime
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://admin:omarchy@postgres:5432/postgres
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change_me_to_a_secure_32_char_secret}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      NODE_ENV: production
+      PORT: 3000
+      CORS_ORIGINS: http://localhost:3000
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  seed:
+    build:
+      context: .
+      target: deps
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://admin:omarchy@postgres:5432/postgres
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change_me_to_a_secure_32_char_secret}
+      BETTER_AUTH_URL: http://localhost:3000
+    command: bun run scripts/seed.ts
+    profiles:
+      - seed
+    restart: "no"
+
+volumes:
+  pg_data:

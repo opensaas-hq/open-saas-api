@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     name: Lint, Typecheck & Test
@@ -29,11 +33,13 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Bun Environment
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.2
 
       - name: Install Dependencies
         run: bun install --frozen-lockfile
@@ -44,14 +50,76 @@ jobs:
       - name: Run TypeScript Typecheck
         run: bun run typecheck
 
-      - name: Run Database Push
+      - name: Check the OpenAPI contract is in sync
+        run: bun run --filter @opensaas/api openapi:check
+
+      - name: Check the GraphQL schema is in sync
+        run: bun run --filter @opensaas/api graphql:check
+
+      - name: Run Database Migrations
         env:
-           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test
-           run: bun --filter @opensaas/database db:push
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test
+        run: bun --filter @opensaas/database db:migrate
 
       - name: Run Tests
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test
-          BETTER_AUTH_SECRET: ci_secret_key_123456789_opensaas
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET || 'ci_secret_key_123456789_opensaas_test_secret_32' }}
           BETTER_AUTH_URL: http://localhost:3000
+          # The suites run without row-level security; the "Row-Level Security
+          # proof" job applies the bootstrap and turns the flag on (§2.5).
+          RLS_ENABLED: "false"
         run: bun test
+
+  rls:
+    name: Row-Level Security proof
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: opensaas_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun Environment
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Apply Schema
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test
+        run: bun --filter @opensaas/database db:migrate
+
+      - name: Apply RLS Bootstrap
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test
+        run: bun --filter @opensaas/database db:rls:test
+
+      - name: Run RLS Proof Suite
+        working-directory: packages/database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opensaas_test
+          DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/opensaas_test
+          RLS_ENABLED: "true"
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET || 'ci_secret_key_123456789_opensaas_test_secret_32' }}
+          BETTER_AUTH_URL: http://localhost:3000
+        run: bun test src/__tests__/rls.test.ts src/__tests__/rls-setup.test.ts src/__tests__/rls-enforcement.test.ts

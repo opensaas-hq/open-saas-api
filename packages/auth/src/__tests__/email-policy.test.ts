@@ -1,10 +1,19 @@
 import { describe, expect, test } from "bun:test";
-import { ValidationError } from "@opensaas/core";
+import { initConfig, resetConfig } from "@opensaas/core";
 import {
+  getDisposableDomains,
   isDisposableEmail,
   normalizeEmail,
+  parseDomainList,
   validateAndNormalizeEmail,
 } from "../email-policy";
+
+const baseConfig = {
+  NODE_ENV: "test",
+  DATABASE_URL: "postgresql://postgres:password@localhost:5432/opensaas",
+  BETTER_AUTH_SECRET: "x".repeat(32),
+  BETTER_AUTH_URL: "http://localhost:3000",
+};
 
 describe("@opensaas/auth - Email Policy & Anti-Abuse", () => {
   describe("normalizeEmail()", () => {
@@ -29,6 +38,20 @@ describe("@opensaas/auth - Email Policy & Anti-Abuse", () => {
     });
   });
 
+  describe("parseDomainList()", () => {
+    test("normalizes, trims and drops blanks", () => {
+      expect(parseDomainList("  Burner.COM , , Temp.org ")).toEqual([
+        "burner.com",
+        "temp.org",
+      ]);
+    });
+
+    test("returns an empty list for undefined or blank input", () => {
+      expect(parseDomainList(undefined)).toEqual([]);
+      expect(parseDomainList("   ")).toEqual([]);
+    });
+  });
+
   describe("isDisposableEmail()", () => {
     test("should identify disposable domains", () => {
       expect(isDisposableEmail("test@mailinator.com")).toBe(true);
@@ -41,21 +64,21 @@ describe("@opensaas/auth - Email Policy & Anti-Abuse", () => {
       expect(isDisposableEmail("contact@opensaas.org")).toBe(false);
     });
 
-    test("should block custom disposable domains passed via DISPOSABLE_EMAIL_DOMAINS env var", () => {
-      process.env.DISPOSABLE_EMAIL_DOMAINS =
-        "custom-burner.com, another-temp.org";
-
-      expect(isDisposableEmail("user@custom-burner.com")).toBe(true);
-      expect(isDisposableEmail("user@another-temp.org")).toBe(true);
-
-      process.env.DISPOSABLE_EMAIL_DOMAINS = undefined;
+    test("blocks env-configured domains merged with the built-ins", () => {
+      const domains = getDisposableDomains(
+        "custom-burner.com, another-temp.org",
+      );
+      expect(domains.has("custom-burner.com")).toBe(true);
+      expect(domains.has("another-temp.org")).toBe(true);
+      expect(domains.has("mailinator.com")).toBe(true);
+      expect(isDisposableEmail("user@custom-burner.com", domains)).toBe(true);
     });
   });
 
   describe("validateAndNormalizeEmail()", () => {
     test("should reject disposable email with ValidationError", () => {
       expect(() => validateAndNormalizeEmail("spammer@mailinator.com")).toThrow(
-        ValidationError,
+        "Disposable/temporary email addresses are not allowed",
       );
     });
 
@@ -64,6 +87,27 @@ describe("@opensaas/auth - Email Policy & Anti-Abuse", () => {
         "  John.Doe+Alias@Gmail.com ",
       );
       expect(normalized).toBe("johndoe@gmail.com");
+    });
+
+    // §3.6 AC2: an env-provided domain blocks registration through the same
+    // 422 DISPOSABLE_EMAIL_REJECTED path as a built-in, reading validated config.
+    test("an env-provided domain is blocked via validated config (no process.env)", () => {
+      initConfig({
+        ...baseConfig,
+        DISPOSABLE_EMAIL_DOMAINS: "custom-burner.com",
+      });
+      try {
+        const domains = getDisposableDomains();
+        expect(domains.has("custom-burner.com")).toBe(true);
+        expect(() =>
+          validateAndNormalizeEmail("user@custom-burner.com"),
+        ).toThrow("Disposable/temporary email addresses are not allowed");
+      } finally {
+        // Restore the real process configuration so a shared-process test run
+        // (TD-11) rebuilds a valid config for later suites.
+        resetConfig();
+        initConfig();
+      }
     });
   });
 });

@@ -78,6 +78,11 @@ bun.lockb
 .drizzle/
 drizzle/*.sql.json
 
+# Committed, reviewable migrations live here (§2.3): keep the SQL and the
+# drizzle-kit journal/meta, but never the local cache.
+!packages/database/drizzle/
+!packages/database/drizzle/**
+
 # ==================================================
 # IDEs & Operating System Files
 # ==================================================
@@ -90,3 +95,4 @@ drizzle/*.sql.json
 .idea/
 .node_repl_history
 .tern-port
+docs/

@@ -51,11 +51,12 @@ function parseUserAgent(ua: string) {
   if (/mobile/i.test(ua)) deviceType = "mobile";
   else if (/ipad|tablet/i.test(ua)) deviceType = "tablet";
 
-  // OS detection
-  if (/macintosh|mac os x/i.test(ua)) os = "macOS";
+  // OS detection. iOS is checked before macOS because iOS user agents also
+  // contain "like Mac OS X", which would otherwise be misclassified.
+  if (/iphone|ipad|ipod/i.test(ua)) os = "iOS";
+  else if (/macintosh|mac os x/i.test(ua)) os = "macOS";
   else if (/windows/i.test(ua)) os = "Windows";
   else if (/android/i.test(ua)) os = "Android";
-  else if (/iphone|ipad|ipod/i.test(ua)) os = "iOS";
   else if (/linux/i.test(ua)) os = "Linux";
 
   // Browser detection

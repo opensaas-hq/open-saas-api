@@ -1,10 +1,19 @@
 import * as schema from "./schema";
 
 export * from "./client";
-export * from "./contacts";
 export * from "./schema";
-export * from "./health";
+export * from "./client/health";
+export * from "./client/rls";
 export * from "./repositories/organization";
+export * from "./repositories/member";
+export * from "./repositories/contact";
+export * from "./repositories/branch";
+export * from "./repositories/audit";
+export * from "./repositories/idempotency";
+export * from "./repositories/like";
+export * from "./repositories/waitlist";
+export * from "./repositories/registration-code";
+export * from "./client/resilience";
 
 // Export schema bundle for ORM adapters like Better Auth
 export { schema };
